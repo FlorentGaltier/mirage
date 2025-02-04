@@ -13,6 +13,7 @@ from mirage.libs.bt_utils.constants import *
 from mirage.libs import wireless,io,utils
 
 import traceback
+import os
 
 class BtHCIDevice(wireless.Device):
 	'''
@@ -39,6 +40,7 @@ class BtHCIDevice(wireless.Device):
 		self.pendingQueue = Queue()
 		#self.pendingQueue = deque()
 		self.initializeBluetooth = True
+		self.__index = int(interface[3:])
 
 	def _initBT(self):
 		self._enterCommandMode()
@@ -77,6 +79,8 @@ class BtHCIDevice(wireless.Device):
 				try:
 					self.socket = BluetoothUserSocket(self.adapter)
 				except BluetoothSocketError as e:
+					import traceback
+					traceback.print_exc()
 					io.fail("Error during HCI device instanciation !")
 					return False
 		if self.socket is not None:
@@ -104,11 +108,23 @@ class BtHCIDevice(wireless.Device):
 		#	recv=self.socket.recv()
 		#	self.recvLock.release()
 		if not self.pendingQueue.empty():
+			#print("DEBUG _recv A 1")
 			recv = self.pendingQueue.get(block=True)
+			#print("DEBUG _recv A 2")
 		else:
+			#print("DEBUG _recv B 1")
 			self.recvLock.acquire()
-			recv = self.socket.recv()
+			#print("DEBUG _recv B 2")
+			try:
+				recv = self.socket.recv()
+			except Exception as e:
+				import traceback
+				traceback.print_exc()
+				print(e)
+				recv=None
+			#print("DEBUG _recv B 3")
 			self.recvLock.release()
+			#print("DEBUG _recv B 4")
 		return recv
 
 
@@ -135,7 +151,8 @@ class BtHCIDevice(wireless.Device):
 		# An error may occur during a socket restart
 		except BrokenPipeError as e:
 			self._exitListening()
-			raise e
+			return None
+			#raise e
 		except OSError as e:
 			traceback.print_exc()
 			self._exitListening()
@@ -144,26 +161,39 @@ class BtHCIDevice(wireless.Device):
 
 	def _internalCommand(self,cmd,noResponse=False):
 		cmd = HCI_Hdr()/HCI_Command_Hdr()/cmd
+		#print(f"DEBUG internalCommand {cmd=}")
 		while not self._commandModeEnabled():
 			utils.wait(seconds=0.05)
 			#utils.wait(second=0.01)
 			#pass
+		#print("DEBUG commandModeEnabled")
 		self._flushCommandResponses()
 
 		self.send(cmd)
+		#print("DEBUG commandSent")
 		if not noResponse:
+			#print("Waiting for response...")
+			if SCAPY_VERSION>=VERSION_2_5_0 and SCAPY_VERSION<VERSION_2_6_0:
+				cmd_opcode=cmd.opcode
+			elif SCAPY_VERSION>=VERSION_2_6_0 and SCAPY_VERSION<VERSION_2_7_0:
+				cmd_opcode=(cmd.ogf<<10)+cmd.ocf
 			if self._isListening():
-				getResponse = self.commandResponses.get
+				#print("DEBUG selecting getResp a")
+				getResponse = lambda:self.commandResponses.get() if not self.commandResponses.empty() else None
 			else:
+				#print("DEBUG selecting getResp b")
 				getResponse = self._recv
+			#print("DEBUG getResp 1")
 			response = getResponse()
-			#response.show()
+			#print(f"DEBUG getResp 2 {response=}")
 			while response is None or response.type != 0x04 or response.code != 0xe:
 				response = getResponse()
-			if response.type == 0x04 and response.code == 0xe and response.opcode == cmd.opcode:
+			if response.type == 0x04 and response.code == 0xe and response.opcode == cmd_opcode:
 				if response.status != 0:
-					raise BluetoothCommandError("Command %x failed with %x" % (cmd.opcode,response.status))
+					raise BluetoothCommandError("Command %x failed with %x" % (cmd_opcode,response.status))
 				return response
+			elif response.type == 0x04 and response.code == 0xe:
+				response.show()
 	def _enterCommandMode(self):
 		self.commandMode = True
 	def _exitCommandMode(self):
@@ -382,7 +412,10 @@ class BtHCIDevice(wireless.Device):
 	def _getManufacturerId(self):
 		self._enterCommandMode()
 		response = self._internalCommand(HCI_Cmd_Read_Local_Version_Information())
-		manufacturer = response.manufacturer
+		if SCAPY_VERSION>=VERSION_2_5_0 and SCAPY_VERSION<VERSION_2_6_0:
+			manufacturer=response.manufacturer
+		elif SCAPY_VERSION>=VERSION_2_6_0 and SCAPY_VERSION<VERSION_2_7_0:
+			manufacturer=response.company_identifier
 		self._exitCommandMode()
 		return manufacturer
 
@@ -478,25 +511,72 @@ class BtHCIDevice(wireless.Device):
 		address = address.upper()
 		success = False
 		if self.isAddressChangeable():
-			self._enterCommandMode()
+			if False:
+				for path in os.environ["PATH"].split(os.pathsep):
+					exe_path=os.path.join(path, "bdaddr")
+					if os.path.isfile(exe_path) and os.access(path, os.X_OK):
+						self._exitListening()
+						self.socket.close()
+						self.socket=None
+						utils.wait(seconds=1)
+						os.system(f"bdaddr -r -i hci{self.adapter} {address}")
+						utils.wait(seconds=1)
+						self._createSocket()
+						return True
+			self._exitListening()
 			io.info("Changing HCI Device ("+self.interface+") Address to : "+address)
+			self._enterCommandMode()
+			self.socket.close()
+			self.socket=None
+			utils.wait(seconds=1)
 			response = self._internalCommand(HCI_Cmd_Read_Local_Version_Information())
-			manufacturer = response.manufacturer
-
+			if SCAPY_VERSION>=VERSION_2_5_0 and SCAPY_VERSION<VERSION_2_6_0:
+				manufacturer=response.manufacturer
+			elif SCAPY_VERSION>=VERSION_2_6_0 and SCAPY_VERSION<VERSION_2_7_0:
+				manufacturer=response.company_identifier
 			if manufacturer not in COMPATIBLE_VENDORS:
 				io.fail("The vendor has not provided a way to modify the BD Address.")
 				success = False
 			elif manufacturer == 10: # Cambridge Silicon Radio
-				self._internalCommand(HCI_Cmd_CSR_Write_BD_Address(addr=address),noResponse=True)
-				io.success("BD Address successfully modified !")
-				self._internalCommand(HCI_Cmd_CSR_Reset(),noResponse=True)
-
-				self.socket.close()
 				utils.wait(seconds=1)
-				self._createSocket()
+				#print("DEBUG CSR - modifying address")
+				existing_devices=HCIConfig.list()
+				self._internalCommand(HCI_Cmd_CSR_Write_BD_Address(addr=address),noResponse=True)
+				#utils.wait(seconds=1)
+				io.success("BD Address successfully modified !")
+				#HCIConfig.down(self.adapter)
+				#self.socket.close()
+				utils.wait(seconds=1)
+				self._internalCommand(HCI_Cmd_CSR_Reset(),noResponse=True)
+				utils.wait(seconds=1)
 
-				success = True
+				#try:
+				#	success=False
+				#	while not success:
+				#		devices = HCIConfig.list()
+				#		print(f"DEBUG {existing_devices=} {devices=} {self.adapter=} {type(devices[0])=} {type(self.__index)=}")
+				#		if self.adapter not in devices:
+				#			for i in existing_devices:
+				#				if i != self.adapter:
+				#					devices.remove(i)
+				#			if devices:
+				#				self.adapter = devices[0]
+				#				self.interface=f"hci{self.adapter}"
+				#				success=True
+				#		else:
+				#			success=True
+				#	utils.wait(seconds=1)
+				#	self._createSocket()
+				#	utils.wait(seconds=1)
+				#	self._exitCommandMode()
+				#except Exception as e:
+				#	import traceback
+				#	#print("DEBUG houla CSR toussa")
+				#	traceback.print_exc()
+				#	success=False
+				##success = True
 			else:
+				self._enterCommandMode()
 				modificationPackets = {
 							0 : HCI_Cmd_Ericsson_Write_BD_Address,
 							13 : HCI_Cmd_TI_Write_BD_Address,
@@ -507,9 +587,15 @@ class BtHCIDevice(wireless.Device):
 						  }
 				self._internalCommand(modificationPackets[manufacturer](addr=address))
 				self._internalCommand(HCI_Cmd_Reset())
+				#self._exitCommandMode()
 				io.success("BD Address successfully modified !")
 				success = True
+				#self._exitCommandMode()
 			self._exitCommandMode()
+			self.socket.close()
+			self.socket=None
+			utils.wait(seconds=1)
+			self._createSocket()
 		return success
 
 

@@ -129,9 +129,15 @@ class BLEHCIDevice(bt.BtHCIDevice):
 		self._enterCommandMode()
 		self._internalCommand(HCI_Cmd_Reset())
 		self._internalCommand(HCI_Cmd_Set_Event_Filter())
-		self._internalCommand(HCI_Cmd_Connect_Accept_Timeout())
+		if SCAPY_VERSION>=VERSION_2_5_0 and SCAPY_VERSION<VERSION_2_6_0:
+			self._internalCommand(HCI_Cmd_Connect_Accept_Timeout())
+		elif SCAPY_VERSION>=VERSION_2_6_0 and SCAPY_VERSION<VERSION_2_7_0:
+			self._internalCommand(HCI_Cmd_Write_Connect_Accept_Timeout())
 		self._internalCommand(HCI_Cmd_Set_Event_Mask())
-		self._internalCommand(HCI_Cmd_LE_Host_Supported())
+		if SCAPY_VERSION>=VERSION_2_5_0 and SCAPY_VERSION<VERSION_2_6_0:
+			self._internalCommand(HCI_Cmd_LE_Host_Supported())
+		elif SCAPY_VERSION>=VERSION_2_6_0 and SCAPY_VERSION<VERSION_2_7_0:
+			self._internalCommand(HCI_Cmd_Write_LE_Host_Support())
 		self._exitCommandMode()
 
 		self.capabilities = ["SCANNING", "ADVERTISING", "INITIATING_CONNECTION", "RECEIVING_CONNECTION", "COMMUNICATING_AS_MASTER", "COMMUNICATING_AS_SLAVE"]
@@ -353,7 +359,10 @@ class BLEHCIDevice(bt.BtHCIDevice):
 			else:
 				advData = data+(31 - len(data))*b"\x00"
 
-			self._internalCommand(New_HCI_Cmd_LE_Set_Scan_Response_Data(data=advData,len=len(data)))
+			if SCAPY_VERSION>=VERSION_2_5_0 and SCAPY_VERSION<VERSION_2_6_0:
+				self._internalCommand(New_HCI_Cmd_LE_Set_Scan_Response_Data(data=advData,len=len(data)))
+			elif SCAPY_VERSION>=VERSION_2_6_0 and SCAPY_VERSION<VERSION_2_7_0:
+				self._internalCommand(HCI_Cmd_LE_Set_Scan_Response_Data(data=advData,len=len(data)))
 		self._exitCommandMode()
 
 	def setAdvertisingParameters(self,type = "ADV_IND",destAddr = "00:00:00:00:00:00",data = b"",intervalMin = 200, intervalMax = 210, daType='public', oaType='public'):
@@ -412,7 +421,10 @@ class BLEHCIDevice(bt.BtHCIDevice):
 				advData = data+(31 - len(data))*b"\x00"
 
 		self._internalCommand(HCI_Cmd_LE_Set_Advertising_Parameters(adv_type=advType, daddr=dAddr, datype=daType, oatype=oaType,interval_min=intervalMin, interval_max = intervalMax))
-		self._internalCommand(New_HCI_Cmd_LE_Set_Advertising_Data(data=EIR_Hdr(advData)))
+		if SCAPY_VERSION>=VERSION_2_5_0 and SCAPY_VERSION<VERSION_2_6_0:
+			self._internalCommand(New_HCI_Cmd_LE_Set_Advertising_Data(data=EIR_Hdr(advData)))
+		elif SCAPY_VERSION>=VERSION_2_6_0 and SCAPY_VERSION<VERSION_2_7_0:
+			self._internalCommand(HCI_Cmd_LE_Set_Advertising_Data(data=EIR_Hdr(advData)))
 		self._exitCommandMode()
 
 	def _setAddressMode(self,mode="public"):
@@ -722,9 +734,12 @@ class BLEEmitter(wireless.Emitter):
 								max_key_size = packet.maxKeySize,
 								initiator_key_distribution=packet.initiatorKeyDistribution,
 								responder_key_distribution = packet.responderKeyDistribution)
+						#print("Convert Pairing Request")
+						#packet.packet.show()
 
 
 					elif isinstance(packet,BLEPairingResponse): # NOTE : was using isinstance
+						#packet.show()
 						packet.packet /= SM_Pairing_Response(
 								iocap=packet.inputOutputCapability,
 								oob=1 if packet.outOfBand else 0,
@@ -732,6 +747,8 @@ class BLEEmitter(wireless.Emitter):
 								max_key_size = packet.maxKeySize,
 								initiator_key_distribution=packet.initiatorKeyDistribution,
 								responder_key_distribution = packet.responderKeyDistribution)
+						#print("Convert Pairing Response")
+						#packet.packet.show()
 
 					elif isinstance(packet,BLEPairingFailed): # NOTE : was using isinstance
 						packet.packet /= SM_Failed(reason=packet.reason)
@@ -843,7 +860,6 @@ class BLEEmitter(wireless.Emitter):
 
 
 		return packet.packet
-
 
 class BLEReceiver(wireless.Receiver):
 	'''
@@ -1060,20 +1076,26 @@ class BLEReceiver(wireless.Receiver):
 							authentication = packet.authentication)
 
 				elif SM_Pairing_Request in packet:
+					#print("Convert SM_Pairing_Request")
+					#packet.show()
 					return BLEPairingRequest(
 						connectionHandle = packet.handle,
 						inputOutputCapability=packet.iocap,
 						outOfBand=packet.oob == 1,
+						maxKeySize=packet.max_key_size,
 						authentication=packet.authentication,
 						initiatorKeyDistribution=packet.initiator_key_distribution,
 						responderKeyDistribution=packet.responder_key_distribution,
 						payload=raw(packet[SM_Hdr:]))
 
 				elif SM_Pairing_Response in packet:
+					#print("Convert SM_Pairing_Response")
+					#packet.show()
 					return BLEPairingResponse(
 						connectionHandle = packet.handle,
 						inputOutputCapability=packet.iocap,
 						outOfBand=packet.oob == 1,
+						maxKeySize=packet.max_key_size,
 						authentication=packet.authentication,
 						initiatorKeyDistribution=packet.initiator_key_distribution,
 						responderKeyDistribution=packet.responder_key_distribution,
@@ -1438,6 +1460,9 @@ class BLEReceiver(wireless.Receiver):
 								initiatorKeyDistribution=packet.initiator_key_distribution,
 								responderKeyDistribution=packet.responder_key_distribution,
 								payload=raw(packet[SM_Hdr:]))
+							#print("on continue")
+							#packet.show()
+							#new.show()
 
 						elif SM_Pairing_Response in packet:
 							new = BLEPairingResponse(
@@ -1447,6 +1472,9 @@ class BLEReceiver(wireless.Receiver):
 								initiatorKeyDistribution=packet.initiator_key_distribution,
 								responderKeyDistribution=packet.responder_key_distribution,
 								payload=raw(packet[SM_Hdr:]))
+							#print("on continue")
+							#packet.show()
+							#new.show()
 
 						elif SM_Failed in packet:
 							new = BLEPairingFailed(reason=packet.reason)
@@ -1500,6 +1528,7 @@ class BLEReceiver(wireless.Receiver):
 								moveResult=packet.move_result
 								)
 					elif packet.LLID == 3:
+						#packet.show()
 
 						try:
 							controlType = CONTROL_TYPES[packet.opcode]

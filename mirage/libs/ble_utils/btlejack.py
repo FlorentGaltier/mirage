@@ -7,6 +7,7 @@ from mirage.libs.ble_utils.constants import *
 from mirage.libs.ble_utils.scapy_btlejack_layers import *
 from mirage.libs import io,utils,wireless
 
+
 class BTLEJackDevice(wireless.Device):
 	'''
 	This device allows to communicate with a BTLEJack Device in order to sniff Bluetooth Low Energy protocol.
@@ -539,7 +540,11 @@ class BTLEJackDevice(wireless.Device):
 						self._setHopInterval(hopInterval)
 						self._setHopIncrement(hopIncrement)
 						if self.hijacking:
-							self._internalCommand(BTLEJack_Enable_Hijacking_Command(enabled=0x01))
+							#print("DEBUG : Sending BTLEJack hijacking command")
+							p=BTLEJack_Enable_Hijacking_Command(enabled=0x01)
+							#p.show()
+							self._internalCommand(p)
+							#print("DEBUG : BTLEJack hijacking command sent")
 						elif self.jamming:
 							self._internalCommand(BTLEJack_Enable_Jamming_Command(enabled=0x01))
 						self.synchronized = True
@@ -946,6 +951,8 @@ class BTLEJackDevice(wireless.Device):
 		pkt = self._recv()
 		self._exitListening()
 		if pkt is not None:
+			#print("DEBUG BTLEJACK : Received a packet!")
+			#pkt.show()
 
 			if self.customMirageFirmware and BTLEJack_Advertisement_Packet_Notification in pkt:
 				timestamp = time.time()
@@ -995,6 +1002,8 @@ class BTLEJackDevice(wireless.Device):
 				self.synchronized = True
 
 			if BTLEJack_Hijack_Status_Notification in pkt:
+				if pkt.status != 0:
+					io.fail("Attack failed")
 				self.hijacked = (pkt.status == 0x00)
 
 			if BTLEJack_Nordic_Tap_Packet_Notification in pkt:

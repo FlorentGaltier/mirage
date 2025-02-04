@@ -55,7 +55,8 @@ class Loader:
 
 		for module in self.modulesList:
 			if self.modulesList[module] is None:
-				tmp_import=__import__("mirage.modules."+module,fromlist=[module])
+				#tmp_import=__import__("mirage.modules."+module,fromlist=[module])
+				tmp_import=__import__("mirage.modules",fromlist=[module])
 				tmp_module=getattr(tmp_import,module)
 				self.modulesList[module]=getattr(tmp_module,module)
 			info = self.modulesList[module]().info()

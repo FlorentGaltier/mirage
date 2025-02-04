@@ -3,6 +3,8 @@ from mirage.core import module
 
 class ble_hijack(module.WirelessModule):
 	def init(self):
+		# PRELOADING
+		utils.loadModule("ble_sniff")
 
 		self.technology = "ble"
 		self.type = "attack"

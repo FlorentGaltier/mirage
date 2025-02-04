@@ -9,7 +9,6 @@ import traceback
 BUTTERFLY_ID_VENDOR = 0x5A17
 BUTTERFLY_ID_PRODUCT = 0x0000
 
-
 def timeouted(timeout, default_return):
 	def decorator_timeout(function):
 		def aux_retval(function, *args, **kwargs):
@@ -42,7 +41,6 @@ def timeouted(timeout, default_return):
 @timeouted(10, 0)
 def timeouted_read(dongle, endpoint, size_or_buffer, timeout=None):
 	return dongle.read(endpoint, size_or_buffer, timeout=timeout)
-
 
 class ButterflyDevice(wireless.Device):
 	'''

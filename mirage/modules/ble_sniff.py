@@ -3,6 +3,9 @@ from mirage.core import module
 
 class ble_sniff(module.WirelessModule):
 	def init(self):
+		#PRELOADING
+		utils.loadModule("ble_crack")
+
 		self.technology = "ble"
 		self.type = "sniff"
 		self.description = "Sniffing module for Bluetooth Low Energy devices"
@@ -287,8 +290,8 @@ class ble_sniff(module.WirelessModule):
 						receiver.getHopIncrement()
 						)
 				if "butterfly" in receiver.interface and utils.booleanArg(self.args["MITMING"]):
-					io.info("Attack started in 7 seconds...")
-					utils.wait(seconds=7)
+					io.info("Attack start in 2 seconds...")
+					utils.wait(seconds=2)
 					receiver.setMitm(enable=True)
 					while not receiver.isConnected() and receiver.isSynchronized():
 						utils.wait(seconds=0.001)
@@ -299,7 +302,7 @@ class ble_sniff(module.WirelessModule):
 					else:
 						return self.nok()
 				if "butterfly" in receiver.interface and utils.booleanArg(self.args["HIJACKING_SLAVE"]):
-					io.info("Attack started in 5 seconds...")
+					io.info("Attack start in 5 seconds...")
 					utils.wait(seconds=5)
 					receiver.setHijacking(target="slave",enable=True)
 					while not receiver.isConnected() and receiver.isSynchronized():
@@ -314,7 +317,7 @@ class ble_sniff(module.WirelessModule):
 
 
 				if "butterfly" in receiver.interface and utils.booleanArg(self.args["HIJACKING_MASTER"]):
-					io.info("Attack started in 5 seconds...")
+					io.info("Attack start in 5 seconds...")
 					utils.wait(seconds=5)
 					receiver.setHijacking(target="master",enable=True)
 					while not receiver.isConnected() and receiver.isSynchronized():

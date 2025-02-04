@@ -1195,7 +1195,7 @@ class BLEPairingRequest(BLEPacket):
 		self.initiatorKeyDistribution = initiatorKeyDistribution
 		self.responderKeyDistribution = responderKeyDistribution
 		self.connectionHandle = connectionHandle
-		self.payload = payload if payload != b"" else raw(SM_Hdr()/SM_Pairing_Request(
+		self.payload = payload if payload != b"" else bytes(SM_Hdr()/SM_Pairing_Request( # was "raw" instead of bytes
 						iocap=self.inputOutputCapability,
 						oob=1 if self.outOfBand else 0,
 						authentication=self.authentication,
@@ -1239,7 +1239,7 @@ class BLEPairingResponse(BLEPacket):
 		self.initiatorKeyDistribution = initiatorKeyDistribution
 		self.responderKeyDistribution = responderKeyDistribution
 		self.connectionHandle = connectionHandle
-		self.payload = payload if payload != b"" else raw(SM_Hdr()/SM_Pairing_Response(
+		self.payload = payload if payload != b"" else bytes(SM_Hdr()/SM_Pairing_Response( # was "raw" instead of bytes
 						iocap=self.inputOutputCapability,
 						oob=1 if self.outOfBand else 0,
 						authentication=self.authentication,

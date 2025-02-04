@@ -4,6 +4,7 @@ from mirage.libs import wireless,io,utils
 from queue import Queue
 from mirage.libs.wireless_utils.device import Device
 
+
 class BLEButterflySubdevice(wireless.Device):
 	'''
 	This (sub)device allows to interact with one specific role (Master or Slave) of a BLE connection when an InjectaBLE complex attack is performed using ButteRFly Device.
@@ -28,8 +29,11 @@ class BLEButterflySubdevice(wireless.Device):
 		"getCurrentHandle",
 		"getConnections",
 		"getCurrentConnection",
+		"setChannelMap", # debug hijacking...
 		"switchConnection"
 	]
+	def setChannelMap(self,channelMap=None): # DEBUG hijacking...
+		pass
 
 	def __init__(self,interface):
 		super().__init__(interface=interface)
@@ -165,7 +169,6 @@ class BLEButterflySubdevice(wireless.Device):
 	def close(self):
 		self.mainDevice.detachSubDevice("master" if self.subIndex == 0 else "slave")
 
-
 class BLEButterflyDevice(wireless.ButterflyDevice):
 	'''
 	This device allows to communicate with a ButteRFly Device in order to interact with Bluetooth Low Energy protocol.
@@ -222,6 +225,7 @@ class BLEButterflyDevice(wireless.ButterflyDevice):
 		"getAccessAddress",
 		"getCrcInit",
 		"getChannelMap",
+		"setChannelMap", # debug hijacking...
 		"getHopInterval",
 		"getHopIncrement",
 
@@ -661,6 +665,8 @@ class BLEButterflyDevice(wireless.ButterflyDevice):
 		self.crcInit = crcInit
 
 	def _setChannelMap(self,channelMap=None):
+		self.channelMap = channelMap
+	def setChannelMap(self,channelMap=None): # DEBUG hijacking...
 		self.channelMap = channelMap
 
 	def _setHopInterval(self,hopInterval=None):

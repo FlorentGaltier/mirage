@@ -25,6 +25,10 @@ class ble_mitm(module.WirelessModule):
 		return a2scap and a2mcap
 
 	def init(self):
+		#PRELOADING
+		utils.loadModule("ble_sniff")
+		utils.loadModule("ble_crack")
+
 		self.technology = "ble"
 		self.type = "attack"
 		self.description = "Man-in-the-Middle module for Bluetooth Low Energy devices"
@@ -151,7 +155,12 @@ class ble_mitm(module.WirelessModule):
 
 		if utils.booleanArg(self.args["SLAVE_SPOOFING"]) and address != self.a2mEmitter.getAddress():
 			self.a2mEmitter.setAddress(address, random=addrType)
-		self.a2mEmitter.setScanningParameters(data=dataResponse)
+		try:
+			self.a2mEmitter.setScanningParameters(data=dataResponse)
+		except Exception as e:
+			import traceback
+			traceback.print_exc()
+			print(e)
 		self.a2mEmitter.setAdvertisingParameters(data=data, intervalMin=intervalMin, intervalMax=intervalMax, daType=addrType, oaType=addrType)
 
 
@@ -407,6 +416,7 @@ class ble_mitm(module.WirelessModule):
 	@module.scenarioSignal("onMasterPairingRequest")
 	def pairingRequest(self,packet):
 		if self.stage == BLEMitmStage.ACTIVE_MITM:
+			packet.show()
 			io.info(("Pairing Request (from master) : " +
 			"\n=> outOfBand = "+("yes" if packet.outOfBand else "no") +
 			"\n=> inputOutputCapability = "+ str(ble.InputOutputCapability(data = bytes([packet.inputOutputCapability]))) +
@@ -432,6 +442,7 @@ class ble_mitm(module.WirelessModule):
 	@module.scenarioSignal("onSlavePairingResponse")
 	def pairingResponse(self,packet):
 		if self.stage == BLEMitmStage.ACTIVE_MITM:
+			packet.show()
 			io.info(("Pairing Response (from slave) : " +
 			"\n=> outOfBand = "+("yes" if packet.outOfBand else "no") +
 			"\n=> inputOutputCapability = "+ str(ble.InputOutputCapability(data = bytes([packet.inputOutputCapability]))) +
