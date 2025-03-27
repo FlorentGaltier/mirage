@@ -73,7 +73,7 @@ class BtHCIDevice(wireless.Device):
 		except BluetoothSocketError as e:
 			if not utils.isRoot():
 				io.warning("Mirage should be run as root to instanciate this device !")
-				return False
+				#return False
 			else:
 				HCIConfig.down(self.adapter)
 				try:
@@ -137,6 +137,8 @@ class BtHCIDevice(wireless.Device):
 			if self.socket is not None and self.socket.fileno() != -1 and self.socket.readable():
 				packet = self._recv()
 				#packet.show()
+				if packet is None:
+					return None
 				if self._commandModeEnabled() and packet.type == 0x04:
 					self.commandResponses.put(packet)
 					return None
@@ -526,8 +528,8 @@ class BtHCIDevice(wireless.Device):
 			self._exitListening()
 			io.info("Changing HCI Device ("+self.interface+") Address to : "+address)
 			self._enterCommandMode()
-			self.socket.close()
-			self.socket=None
+			#self.socket.close()
+			#self.socket=None
 			utils.wait(seconds=1)
 			response = self._internalCommand(HCI_Cmd_Read_Local_Version_Information())
 			if SCAPY_VERSION>=VERSION_2_5_0 and SCAPY_VERSION<VERSION_2_6_0:
@@ -549,6 +551,7 @@ class BtHCIDevice(wireless.Device):
 				utils.wait(seconds=1)
 				self._internalCommand(HCI_Cmd_CSR_Reset(),noResponse=True)
 				utils.wait(seconds=1)
+				success=True
 
 				#try:
 				#	success=False
@@ -571,7 +574,6 @@ class BtHCIDevice(wireless.Device):
 				#	self._exitCommandMode()
 				#except Exception as e:
 				#	import traceback
-				#	#print("DEBUG houla CSR toussa")
 				#	traceback.print_exc()
 				#	success=False
 				##success = True
@@ -587,6 +589,7 @@ class BtHCIDevice(wireless.Device):
 						  }
 				self._internalCommand(modificationPackets[manufacturer](addr=address))
 				self._internalCommand(HCI_Cmd_Reset())
+				self.socket.close()
 				#self._exitCommandMode()
 				io.success("BD Address successfully modified !")
 				success = True
@@ -594,7 +597,7 @@ class BtHCIDevice(wireless.Device):
 			self._exitCommandMode()
 			self.socket.close()
 			self.socket=None
-			utils.wait(seconds=1)
+			utils.wait(seconds=2)
 			self._createSocket()
 		return success
 

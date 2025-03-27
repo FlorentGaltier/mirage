@@ -109,8 +109,15 @@ class ATT_Handle_Value_Confirmation(Packet):
 	name = "Handle Value Confirmation"
 	fields_desc = []
 
-bind_layers(HCI_Command_Hdr, HCI_Cmd_LE_Rand, opcode=0x2018)
-bind_layers(HCI_Command_Hdr, HCI_Cmd_LE_Set_Host_Channel_Classification, opcode=0x2014)
+if SCAPY_VERSION>=VERSION_2_5_0 and SCAPY_VERSION<VERSION_2_6_0:
+    bind_layers(HCI_Command_Hdr, HCI_Cmd_LE_Rand, opcode=0x2018)
+    bind_layers(HCI_Command_Hdr, HCI_Cmd_LE_Set_Host_Channel_Classification, opcode=0x2014)
+elif SCAPY_VERSION>=VERSION_2_6_0 and SCAPY_VERSION<VERSION_2_7_0:
+    bind_layers(HCI_Command_Hdr, HCI_Cmd_LE_Rand, ogf=8, ocf=0x018)
+    bind_layers(HCI_Command_Hdr, HCI_Cmd_LE_Set_Host_Channel_Classification, ogf=8, ocf=0x014)
+else:
+	raise Exception(f"Version {SCAPY_VERSION} of Scapy is not supported")
+
 bind_layers(HCI_Event_LE_Meta, HCI_LE_Meta_Enhanced_Connection_Complete, event = 0xa)
 bind_layers(SM_Hdr, SM_Security_Request, sm_command=0xb)
 
@@ -136,4 +143,10 @@ if hasattr(scapy.all,"ATT_Read_Blob_Response"):
 bind_layers(ATT_Hdr, New_ATT_Read_Blob_Request, opcode=0xc)
 bind_layers(ATT_Hdr, New_ATT_Read_Blob_Response, opcode=0xd)
 '''
-bind_layers(ATT_Hdr, ATT_Handle_Value_Confirmation, opcode=0x1e)
+
+if SCAPY_VERSION>=VERSION_2_5_0 and SCAPY_VERSION<VERSION_2_6_0:
+    bind_layers(ATT_Hdr, ATT_Handle_Value_Confirmation, opcode=0x1e)
+elif SCAPY_VERSION>=VERSION_2_6_0 and SCAPY_VERSION<VERSION_2_7_0:
+    bind_layers(ATT_Hdr, ATT_Handle_Value_Confirmation, ogf=0, ocf=0x1e)
+else:
+	raise Exception(f"Version {SCAPY_VERSION} of Scapy is not supported")
