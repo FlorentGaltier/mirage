@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
 
 from mirage.mirage import main
+#import faulthandler
+#faulthandler.enable()
 main()

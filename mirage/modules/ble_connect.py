@@ -11,6 +11,7 @@ class ble_connect(module.WirelessModule):
 				"INTERFACE":"hci0",
 				"TARGET":"fc:58:fa:a1:26:6b",
 				"TIMEOUT":"3",
+                "HOP_INTERVAL":"100",
 				"CONNECTION_TYPE":"public"
 			}
 	def checkCapabilities(self):
@@ -25,7 +26,7 @@ class ble_connect(module.WirelessModule):
 
 		if self.checkCapabilities():
 			io.info("Trying to connect to : "+self.args["TARGET"]+" (type : "+self.args["CONNECTION_TYPE"]+")")
-			self.emitter.sendp(ble.BLEConnect(self.args["TARGET"], type=self.args["CONNECTION_TYPE"]))
+			self.emitter.sendp(ble.BLEConnect(self.args["TARGET"], interval=utils.integerArg(self.args["HOP_INTERVAL"]), type=self.args["CONNECTION_TYPE"]))
 
 			while not self.receiver.isConnected() and timeout > 0:
 				timeout -= 1
@@ -34,8 +35,8 @@ class ble_connect(module.WirelessModule):
 			if self.receiver.isConnected():
 				io.success("Connected on device : "+self.args["TARGET"])
 				return self.ok({"INTERFACE":self.args["INTERFACE"]})
-
-			else:
+ 
+			else: 
 				io.fail("Error during connection establishment !")
 				self.emitter.sendp(ble.BLEConnectionCancel())
 				return self.nok()

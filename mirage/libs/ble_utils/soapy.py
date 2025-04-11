@@ -7,17 +7,20 @@ from mirage.libs.ble_utils.encoders import BLEEncoder
 from mirage.libs.ble_utils.helpers import *
 import time
 
-class BLEHackRFDevice(wireless.SDRDevice):
-	'''
-	This device allows to communicate with a HackRF Device in order to interact with Bluetooth Low Energy protocol.
-	HackRF support is **experimental**, the demodulator is slow and it can only deal with advertisements.
+# FIXME
+import inspect
 
-	The corresponding interfaces are : ``hackrfX`` (e.g. "hackrf0")
+class BLESoapyDevice(wireless.SDRDevice):
+	'''
+	This device allows to communicate with a SoapySDR-compatible Device in order to interact with the Bluetooth Low Energy protocol.
+	SoapySDR support is **experimental**, the demodulator is slow and it can only deal with advertisements.
+
+	The corresponding interfaces are : ``soapyX`` (e.g. "soapy0")
 
 	The following capabilities are actually supported :
 
 	+-------------------------------------------+----------------+
-	| Capability			            | Available ?    |
+	| Capability			                    | Available ?    |
 	+===========================================+================+
 	| SCANNING                                  | yes            |
 	+-------------------------------------------+----------------+
@@ -77,11 +80,16 @@ class BLEHackRFDevice(wireless.SDRDevice):
 
 
 	def __init__(self,interface):
+		self.sink=None
+		self.source=None
+		self.transmitPipeline=None
+		self.receivePipeline=None
 		self.ready = False
 		self.channel = 37
 		self.scanThreadInstance = None
 		self.advThreadInstance = None
-		self.scanInterval = 1
+		#self.scanInterval = 2
+		self.scanInterval = 5
 		self.advData=b""
 		self.address = "11:22:33:44:55:66"
 		self.advType=ADV_IND
@@ -91,15 +99,23 @@ class BLEHackRFDevice(wireless.SDRDevice):
 		self.intervalMin = 200
 		self.intervalMax = 210
 		self.experimentalDemodulatorEnabled = False
+		#self.experimentalDemodulatorEnabled = True
 		super().__init__(interface=interface)
 
 	def isUp(self):
-		return self.sink.isReady() and self.sink.isReady()
+		#return self.sink.isReady() and self.sink.isReady() # TODO prévenir romain, redite du sink
+		test=(self.sink!=None or self.source!=None)
+		test&=(self.sink==None or self.sink.isReady())
+		test&=(self.source==None or self.source.isReady())
+		return test
 
 	def init(self):
-		if self.source.isReady() and self.sink.isReady():
+		#if self.source.isReady() and self.sink.isReady():
+		#if self.source.isReady():
+		if self.isUp():
 			self.ready = True
 			self.capabilities = ["ADVERTISING","SCANNING","SNIFFING_ADVERTISEMENTS"]
+			#self.capabilities = ["SCANNING","SNIFFING_ADVERTISEMENTS"]
 
 	def send(self,packet):
 		self.transmitPipeline.setInput(bytes(packet))
@@ -126,32 +142,41 @@ class BLEHackRFDevice(wireless.SDRDevice):
 			return None
 
 	def buildReceivePipeline(self,interface):
-		self.source = sources.HackRFSource(interface)
+		self.source = sources.SoapySDRSource(interface)
 		if self.source.isReady():
 			self.source.setFrequency(channelToFrequency(self.channel) * 1000 * 1000)
-			self.source.setSampleRate(2 * 1000 * 1000)
-			self.source.setBandwidth(1 * 1000 * 1000)
-			self.source.setGain(30)
+			self.source.setSampleRate(4 * 1000 * 1000)
+			self.source.setBandwidth(4 * 1000 * 1000)
 			self.source.setLNAGain(20)
+			self.source.setGain(50)
 			self.source.enableAntenna()
 			self.demodulator = self._getDemodulator()
-			self.decoder = BLEDecoder(samplesPerSymbol=2)
+			self.decoder = BLEDecoder(samplesPerSymbol=4)
+			#self.decoder = BLEDecoder(samplesPerSymbol=4, crcChecking=False)
+			res = (self.source >> self.demodulator >> self.decoder)
+			if not self.source.isStreaming():
+				self.source.startStreaming()
 
-			return (self.source >> self.demodulator >> self.decoder)
+			return res
 
 		else:
 			return None
 
 	def _getDemodulator(self):
-		return (demodulators.FSK2Demodulator(
-						preamble="01101011011111011001000101110001",
-						size=8*40,
-						samplesPerSymbol=2)
-				if not self.experimentalDemodulatorEnabled else
-				demodulators.FasterFSK2Demodulator(
-						preamble="01101011011111011001000101110001",
-						size=8*40,
-						samplesPerSymbol=2) )
+		return demodulators.NewSuperBFSKDemodulator(
+				preamble="01101011011111011001000101110001",
+				#size=8*40,
+				size=8*80,
+				samplesPerSymbol=4)
+		#return (demodulators.FSK2Demodulator(
+		#				preamble="01101011011111011001000101110001",
+		#				size=8*40,
+		#				samplesPerSymbol=4)
+		#		if not self.experimentalDemodulatorEnabled else
+		#		demodulators.FasterFSK2Demodulator(
+		#				preamble="01101011011111011001000101110001",
+		#				size=8*40,
+		#				samplesPerSymbol=4) )
 
 	def setExperimentalDemodulator(self,enable=True):
 		self.experimentalDemodulatorEnabled = enable
@@ -164,16 +189,21 @@ class BLEHackRFDevice(wireless.SDRDevice):
 				self.receivePipeline.start()
 
 	def buildTransmitPipeline(self,interface):
-		self.sink = sinks.HackRFSink(interface)
+		#print("Mais pourquoi donc?")
+		#print(inspect.stack()[1])
+		#return None
+		self.sink = sinks.SoapySDRSink(interface)
 		if self.sink.isReady():
 			self.sink.setFrequency(channelToFrequency(self.channel) * 1000 * 1000)
-			self.sink.setSampleRate(2 * 1000 * 1000)
-			self.sink.setBandwidth(1 * 1000 * 1000)
-			self.sink.setTXGain(42)
-			self.sink.setLNAGain(40)
-			self.sink.enableAntenna()
-			self.modulator = modulators.GFSKModulator(samplesPerSymbol=2)
-			self.encoder = BLEEncoder(channel=37)
+			self.sink.setSampleRate(4 * 1000 * 1000)
+			self.sink.setBandwidth(4 * 1000 * 1000)
+			self.sink.setLNAGain(20)
+			self.sink.setTXGain(50)
+			self.modulator = modulators.GFSKModulator(samplesPerSymbol=4)
+			self.encoder = BLEEncoder(channel=self.channel)
+			print("IN FINE!")
+			if not self.sink.isStreaming():
+				self.sink.startStreaming()
 			return (self.sink << self.modulator << self.encoder)
 		return None
 
@@ -189,7 +219,7 @@ class BLEHackRFDevice(wireless.SDRDevice):
 		:rtype: bool
 
 		:Example:
-			>>> hackrfDevice.setAddress("11:22:33:44:55:66")
+			>>> soapyDevice.setAddress("11:22:33:44:55:66")
 
 		.. note::
 
@@ -247,8 +277,10 @@ class BLEHackRFDevice(wireless.SDRDevice):
 			if transmitEnabled:
 				self.transmitPipeline.stop()
 			self.channel = channel
-			self.source.setFrequency(channelToFrequency(channel) * 1000 * 1000)
-			self.sink.setFrequency(channelToFrequency(channel) * 1000 * 1000)
+			if self.source!=None:
+				self.source.setFrequency(channelToFrequency(channel) * 1000 * 1000)
+			if self.sink!=None:
+				self.sink.setFrequency(channelToFrequency(channel) * 1000 * 1000)
 			self.decoder.setChannel(channel)
 			self.encoder.setChannel(channel)
 			if receiveEnabled:
@@ -304,7 +336,7 @@ class BLEHackRFDevice(wireless.SDRDevice):
 			self.setChannel(channel)
 		self.receivePipeline.start()
 
-	def setScanInterval(self,seconds=1):
+	def setScanInterval(self,seconds=2):
 		'''
 		This method allows to provide the scan interval (in second).
 
@@ -385,8 +417,6 @@ class BLEHackRFDevice(wireless.SDRDevice):
 				self.transmitPipeline.stop()
 				self.advThreadInstance = None
 				self.receivePipeline.start()
-
-
 
 	def _scanThread(self):
 		self.sniffAdvertisements(channel=37)

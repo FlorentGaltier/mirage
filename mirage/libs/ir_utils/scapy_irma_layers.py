@@ -1,4 +1,6 @@
-from scapy.all import *
+#from scapy.all import *
+from scapy.packet import Packet, bind_layers
+from scapy.fields import *
 
 '''
 This module contains some scapy definitions for interacting with an IRMA device.

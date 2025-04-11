@@ -1,4 +1,4 @@
-from scapy.all import *
+from scapy.layers.bluetooth import *;from scapy.layers.bluetooth4LE import *
 import struct
 from mirage.libs.bt_utils.ubertooth import *
 from mirage.libs.ble_utils.constants import *

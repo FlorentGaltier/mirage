@@ -1,6 +1,8 @@
 from mirage.libs.esb_utils.constants import *
 from mirage.libs.esb_utils.helpers import *
-from scapy.all import *
+#from scapy.all import *
+from scapy.fields import *
+from scapy.packet import Packet, bind_layers
 
 '''
 This module contains some scapy definitions for Enhanced ShockBurst packets.

@@ -1,4 +1,4 @@
-from scapy.all import *
+#from scapy.all import *
 from mirage.core.module import WirelessModule
 from mirage.libs.esb_utils.scapy_esb_layers import *
 from mirage.libs.esb_utils.packets import *

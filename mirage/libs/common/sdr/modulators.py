@@ -308,8 +308,6 @@ class GFSKModulator(SDRModulator):
 
 		self.pulse = self._generateGaussian(1.0,self.samplesPerSymbol, self.bt, self.samplesPerSymbol)
 
-
-
 	def run(self):
 		if self.sink.running:
 			while self.running:
@@ -330,7 +328,10 @@ class GFSKModulator(SDRModulator):
 					for i in range(1,len(outputGaussianFilter)):
 						tmp = tmp+math.pi*self.modulationIndex*outputGaussianFilter[i-1]/float(self.samplesPerSymbol)
 						output.append(math.cos(tmp)+1j*math.sin(tmp))
-					print("Transmitting IQ")
+					print("Transmitting IQ",output)
+					import pickle
+					with open("./debug_transmit.pickle","wb") as f:
+						f.write(pickle.dumps(output))
 					self.sink.transmit(output)
 		else:
 			self.running = False

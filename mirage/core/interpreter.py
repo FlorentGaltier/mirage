@@ -3,6 +3,8 @@ import readline,shlex,re,inspect,glob,sys
 import os
 import keyboard
 
+has_keyboard_warned=False
+
 class Interpreter:
 	'''
 	If a class inherits of this class, it becomes a tiny command interpreter.
@@ -333,24 +335,42 @@ class Interpreter:
 		'''
 		This method enables the suggestion mode.
 		'''
-		keyboard.on_release(self._updateInput)
-		keyboard.on_press_key("enter",self._clearSuggestion)
+		global has_keyboard_warned
+		try:
+			keyboard.on_release(self._updateInput)
+			keyboard.on_press_key("enter",self._clearSuggestion)
+		except ImportError as e:
+			if not has_keyboard_warned:
+				has_keyboard_warned=True
+				io.warning("You must be root to enable suggestions")
 
 	def _disableSuggestion(self):
 		'''
 		This method disables the suggestion mode.
 		'''
-		keyboard.unhook_all()
+		global has_keyboard_warned
+		try:
+			keyboard.unhook_all()
+		except ImportError as e:
+			if not has_keyboard_warned:
+				has_keyboard_warned=True
+				io.warning("You must be root to enable suggestions")
 
 	def loop(self):
 		'''
 		This method is the main interaction loop of the interpreter.
 		'''
+		global has_keyboard_warned
 		while self.running:
 			if self.autocompletionMode:
 				self._enableAutocompletion()
 			if self.suggestionMode:
-				self._enableSuggestion()
+				try:
+					self._enableSuggestion()
+				except ImportError as e:
+					if not has_keyboard_warned:
+						has_keyboard_warned=True
+						io.warning("You must be root to enable suggestions")
 			command=input(self.prompt)
 			if self.autocompletionMode:
 				self._disableAutocompletion()

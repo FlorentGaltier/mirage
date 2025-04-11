@@ -4,6 +4,8 @@ from os.path import isfile
 from struct import unpack,pack
 import time
 
+from scapy.utils import PcapWriter
+
 class PCAPDevice(Device):
 	'''
 	This class provides an easy way to implement a PCAP writer or reader as a Mirage Device.
@@ -47,11 +49,16 @@ class PCAPDevice(Device):
 				self.file = open(self.filename,"rb")
 
 			except IOError as e:
+				import traceback
+				traceback.print_exc()
 				if e.errno == errno.EACCES:
 					io.fail("You don't have permissions to access this file !")
 		else:
 			self.mode = "write"
-			self.file = open(self.filename,"wb")
+			#self.file = open(self.filename,"wb")
+			#self.file = PcapWriter(self.filename, sync=True)
+			self.file=None
+
 	def getMode(self):
 		'''
 		This method returns the mode used by this PCAP Device.
@@ -84,15 +91,19 @@ class PCAPDevice(Device):
 		self.reading = False
 
 	def _readHeader(self):
+		print(f"DEBUG _readHeader")
 		try:
 			header = self.file.read(24)
 			magic,*others,dlt =  unpack('<IHHIIII',header)
 			return (magic,dlt, True)
 		except Exception as e:
+			import traceback
+			traceback.print_exc()
 			print(e)
 			return (-1,-1, False)
 
 	def _addHeader(self):
+		print(f"DEBUG _addHeader {self.DLT=}")
 		dlt = self.DLT
 		magic = 0xa1b2c3d4
 		header = pack('<IHHIIII',
@@ -105,9 +116,11 @@ class PCAPDevice(Device):
 			dlt
 		)
 		try:
-			self.file.write(header)
+			#self.file.write(header)
 			return (magic,dlt,True)
 		except Exception as e:
+			import traceback
+			traceback.print_exc()
 			print(e)
 			return (-1,-1,False)
 		
@@ -119,13 +132,18 @@ class PCAPDevice(Device):
 		:param packet: packet to write
 		:type packet: bytes or scapy frame (if `SCAPY_LAYER` is not None)
 		'''
+		print("OK?")
 		if self.mode == "write":
-			if self.SCAPY_LAYER is not None:
-				packet = bytes(packet)
-			self.putPacket(packet)
+			print("OK.")
+			#if self.SCAPY_LAYER is not None:
+			#	packet = bytes(packet)
+			#self.putPacket(packet)
+			#self.file.write(packet)
+			wrpcap(self.filename, packet, append=True)
 
 	def close(self):
-		self.file.close()
+		if self.file is not None:
+			self.file.close()
 
 	def isUp(self):
 		return self.ready
@@ -144,6 +162,10 @@ class PCAPDevice(Device):
 			io.success("PCAP file successfully loaded (DLT : "+str(self.dlt)+") ! ")
 			self.ready = True
 		else:
+			print(f"{self=}")
+			print(f"{hex(self.magic)=} vs 0xa1b2c3d4")
+			print(f"{self.dlt,self.DLT=}")
+			print(f"{success=}")
 			self.ready = False
 
 	def putPacket(self,data,timestamp = None):
@@ -173,6 +195,8 @@ class PCAPDevice(Device):
 			self.file.write(data)
 			return True
 		except Exception as e:
+			import traceback
+			traceback.print_exc()
 			print(e)
 			return False
 
@@ -191,6 +215,8 @@ class PCAPDevice(Device):
 
 			return (True,(ts_sec + ts_usec/1000000,packet))
 		except:
+			import traceback
+			traceback.print_exc()
 			return (False,None)
 
 	def getAllPackets(self):

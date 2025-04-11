@@ -1,41 +1,58 @@
-from scapy.all import Packet
+from scapy.packet import Packet
 from scapy.layers.bluetooth import *
 '''
 This module contains some scapy definitions defining some vendor specific HCI packets in order to change the BD Address.
 '''
+
+from packaging.version import Version
+from scapy import __version__ as _SCAPY_VERSION
+SCAPY_VERSION=Version(_SCAPY_VERSION)
+
+VERSION_2_5_0=Version("2.5.0")
+VERSION_2_6_0=Version("2.6.0")
+VERSION_2_7_0=Version("2.7.0")
+
+
 COMPATIBLE_VENDORS = [0,10,13,15,18,48,57]
 
  # Packets
  # Read Local Version Information, Command & Event
 
-class HCI_Cmd_Read_Local_Version_Information(Packet):
-	name = "Read Local Version Information"
+if SCAPY_VERSION>=VERSION_2_5_0 and SCAPY_VERSION<VERSION_2_6_0:
+    class HCI_Cmd_Read_Local_Version_Information(Packet):
+        name = "Read Local Version Information"
+    class HCI_Cmd_Complete_Read_Local_Version_Information(Packet):
+        name = "HCI Cmd Complete Read Local Version Information"
+        fields_desc =  [ByteEnumField("hci_version_number",0, {	0x0 : "1.0b",
+                                    0x1 : "1.1",
+                                    0x2 : "1.2",
+                                    0x3:"2.0",
+                                    0x4:"2.1",
+                                    0x5:"3.0",
+                                    0x6: "4.0",
+                                    0x7:"4.1",
+                                    0x8:"4.2",
+                                    0x9:"5.0"}),
+                LEShortField("hci_revision", 0),
+                ByteEnumField("lmp_version_number",0, {	0x0 : "1.0b",
+                                    0x1 : "1.1",
+                                    0x2 : "1.2",
+                                    0x3:"2.0",
+                                    0x4:"2.1",
+                                    0x5:"3.0",
+                                    0x6: "4.0",
+                                    0x7:"4.1",
+                                    0x8:"4.2",
+                                    0x9:"5.0"}),
+                LEShortField("manufacturer", 0),
+                LEShortField("lmp_subversion", 0)]
+    bind_layers(HCI_Command_Hdr, HCI_Cmd_Read_Local_Version_Information, 				opcode=0x1001)
+    bind_layers(HCI_Event_Command_Complete, HCI_Cmd_Complete_Read_Local_Version_Information, 	opcode=0x1001)
+elif SCAPY_VERSION>=VERSION_2_6_0 and SCAPY_VERSION<VERSION_2_7_0:
+    pass
+else:
+    raise Exception(f"Version {SCAPY_VERSION} of Scapy is not supported")
 
-class HCI_Cmd_Complete_Read_Local_Version_Information(Packet):
-	name = "HCI Cmd Complete Read Local Version Information"
-	fields_desc =  [ByteEnumField("hci_version_number",0, {	0x0 : "1.0b",
-								0x1 : "1.1",
-								0x2 : "1.2",
-								0x3:"2.0",
-								0x4:"2.1",
-								0x5:"3.0",
-								0x6: "4.0",
-								0x7:"4.1",
-								0x8:"4.2",
-								0x9:"5.0"}),
-			LEShortField("hci_revision", 0),
-			ByteEnumField("lmp_version_number",0, {	0x0 : "1.0b",
-								0x1 : "1.1",
-								0x2 : "1.2",
-								0x3:"2.0",
-								0x4:"2.1",
-								0x5:"3.0",
-								0x6: "4.0",
-								0x7:"4.1",
-								0x8:"4.2",
-								0x9:"5.0"}),
-			LEShortField("manufacturer", 0),
-			LEShortField("lmp_subversion", 0)]
 
 
 # Vendors specific Commands to Write BD Address
@@ -92,15 +109,21 @@ class HCI_Cmd_ST_Write_BD_Address(Packet):
 
 
 # Bind it to layers
-bind_layers(HCI_Command_Hdr, HCI_Cmd_Read_Local_Version_Information, 				opcode=0x1001)
-bind_layers(HCI_Event_Command_Complete, HCI_Cmd_Complete_Read_Local_Version_Information, 	opcode=0x1001)
 
-bind_layers(HCI_Command_Hdr, HCI_Cmd_ST_Write_BD_Address,					opcode=0xfc22)
-bind_layers(HCI_Command_Hdr, HCI_Cmd_Zeevo_Write_BD_Address, 					opcode=0xfc01)
-bind_layers(HCI_Command_Hdr, HCI_Cmd_TI_Write_BD_Address, 					opcode=0xfc06)
-bind_layers(HCI_Command_Hdr, HCI_Cmd_Ericsson_Write_BD_Address, 				opcode=0xfc0d)
-bind_layers(HCI_Command_Hdr, HCI_Cmd_BCM_Write_BD_Address, 					opcode=0xfc01)
-bind_layers(HCI_Command_Hdr, HCI_Cmd_CSR_Write_BD_Address, 					opcode=0xfc00)
-bind_layers(HCI_Command_Hdr, HCI_Cmd_CSR_Reset, 						opcode=0xfc00)
-
+if SCAPY_VERSION>=VERSION_2_5_0 and SCAPY_VERSION<VERSION_2_6_0:
+    bind_layers(HCI_Command_Hdr, HCI_Cmd_ST_Write_BD_Address,					opcode=0xfc22)
+    bind_layers(HCI_Command_Hdr, HCI_Cmd_Zeevo_Write_BD_Address, 					opcode=0xfc01)
+    bind_layers(HCI_Command_Hdr, HCI_Cmd_TI_Write_BD_Address, 					opcode=0xfc06)
+    bind_layers(HCI_Command_Hdr, HCI_Cmd_Ericsson_Write_BD_Address, 				opcode=0xfc0d)
+    bind_layers(HCI_Command_Hdr, HCI_Cmd_BCM_Write_BD_Address, 					opcode=0xfc01)
+    bind_layers(HCI_Command_Hdr, HCI_Cmd_CSR_Write_BD_Address, 					opcode=0xfc00)
+    bind_layers(HCI_Command_Hdr, HCI_Cmd_CSR_Reset, 						opcode=0xfc00)
+elif SCAPY_VERSION>=VERSION_2_6_0 and SCAPY_VERSION<VERSION_2_7_0:
+    bind_layers(HCI_Command_Hdr, HCI_Cmd_ST_Write_BD_Address,			ogf=0x3f, ocf=0x22)#
+    bind_layers(HCI_Command_Hdr, HCI_Cmd_Zeevo_Write_BD_Address, 		ogf=0x3f, ocf=0x01)#			opcode=0xfc01)
+    bind_layers(HCI_Command_Hdr, HCI_Cmd_TI_Write_BD_Address, 			ogf=0x3f, ocf=0x06)#		opcode=0xfc06)
+    bind_layers(HCI_Command_Hdr, HCI_Cmd_Ericsson_Write_BD_Address, 	ogf=0x3f, ocf=0x0d)#			opcode=0xfc0d)
+    bind_layers(HCI_Command_Hdr, HCI_Cmd_BCM_Write_BD_Address, 			ogf=0x3f, ocf=0x01)#		opcode=0xfc01)
+    bind_layers(HCI_Command_Hdr, HCI_Cmd_CSR_Write_BD_Address, 			ogf=0x3f, ocf=0x00)#		opcode=0xfc00)
+    bind_layers(HCI_Command_Hdr, HCI_Cmd_CSR_Reset, 					ogf=0x3f, ocf=0x00)#	opcode=0xfc00)
 

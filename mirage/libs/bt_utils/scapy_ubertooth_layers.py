@@ -1,4 +1,4 @@
-from scapy.all import *
+from scapy.layers.bluetooth import *;from scapy.layers.bluetooth4LE import *;from scapy.packet import Packet;from scapy.fields import *
 from mirage.libs.bt_utils.constants import *
 '''
 This module contains some scapy definitions for communicating with an Ubertooth device.

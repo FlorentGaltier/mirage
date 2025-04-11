@@ -1,5 +1,6 @@
 import os
 from string import Template
+import mirage
 from mirage.core import interpreter,loader,taskManager,module,config,templates
 from mirage.core.module import WirelessModule
 from mirage.libs import io,utils,wireless
@@ -53,7 +54,7 @@ class App(interpreter.Interpreter):
 		self.quiet = quiet
 		self.debugMode = False # TODO : update documentation
 		self.tempDir = tempDir
-		self.homeDir = homeDir
+		self.homeDir = os.path.dirname(mirage.__file__)#homeDir
 		self.config = config.Config(homeDir + "/mirage.cfg")
 		self.loader = loader.Loader()
 		self.loadedShortcuts = self.config.getShortcuts()
@@ -125,7 +126,6 @@ class App(interpreter.Interpreter):
 			name = io.ask("Scenario's name")
 			if name == "":
 				io.fail("Scenario's name cannot be empty !")
-
 
 		scenario = Template(templates.__scenario_template__)
 		scenarioContent = scenario.substitute(name=name)

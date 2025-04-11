@@ -1,4 +1,4 @@
-from scapy.all import *
+from scapy.layers.bluetooth import *;from scapy.layers.bluetooth4LE import *;from scapy.packet import Packet;from scapy.fields import *
 '''
 This module contains some scapy definitions for Bluetooth protocol.
 Some of them have been recently included in the latest scapy development version, these changes will be taken into account soon.

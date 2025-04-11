@@ -11,4 +11,6 @@ def main():
 		parser.run()
 
 	except (KeyboardInterrupt,EOFError):
+		import traceback
+		traceback.print_exc()
 		mainApp.exit()

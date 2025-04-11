@@ -1,6 +1,6 @@
 from mirage.libs.ble_utils import helpers
 from mirage.libs import wireless
-from scapy.all import *
+from scapy.layers.bluetooth import *;from scapy.layers.bluetooth4LE import *
 import struct
 
 class BLESniffingParameters(wireless.AdditionalInformations):
@@ -153,16 +153,17 @@ class BLEConnect(BLEPacket):
 	:type initiatorType: str
 
 	'''
-	def __init__(self,dstAddr="00:00:00:00:00:00", srcAddr="00:00:00:00:00:00", type="public", initiatorType = "public"):
+	def __init__(self,dstAddr="00:00:00:00:00:00", srcAddr="00:00:00:00:00:00", type="public", initiatorType = "public", interval=100):
 		super().__init__()
 		self.dstAddr = dstAddr.upper()
 		self.srcAddr = srcAddr.upper()
 		self.type = type
+		self.interval = interval
 		self.initiatorType = initiatorType
 		self.name = "BLE - Connect Packet"
 
 	def toString(self):
-		return "<< "+self.name+" | srcAddr="+self.srcAddr+" | dstAddr="+self.dstAddr+" | type="+self.type+" | initiatorType="+self.initiatorType+" >>"
+		return "<< "+self.name+" | srcAddr="+self.srcAddr+" | dstAddr="+self.dstAddr+" | type="+self.type+" | initiatorType="+self.initiatorType+" | interval="+str(self.interval)+" >>"
 
 class BLEConnectResponse(BLEPacket):
 	'''
@@ -1194,7 +1195,7 @@ class BLEPairingRequest(BLEPacket):
 		self.initiatorKeyDistribution = initiatorKeyDistribution
 		self.responderKeyDistribution = responderKeyDistribution
 		self.connectionHandle = connectionHandle
-		self.payload = payload if payload != b"" else raw(SM_Hdr()/SM_Pairing_Request(
+		self.payload = payload if payload != b"" else bytes(SM_Hdr()/SM_Pairing_Request( # was "raw" instead of bytes
 						iocap=self.inputOutputCapability,
 						oob=1 if self.outOfBand else 0,
 						authentication=self.authentication,
@@ -1238,7 +1239,7 @@ class BLEPairingResponse(BLEPacket):
 		self.initiatorKeyDistribution = initiatorKeyDistribution
 		self.responderKeyDistribution = responderKeyDistribution
 		self.connectionHandle = connectionHandle
-		self.payload = payload if payload != b"" else raw(SM_Hdr()/SM_Pairing_Response(
+		self.payload = payload if payload != b"" else bytes(SM_Hdr()/SM_Pairing_Response( # was "raw" instead of bytes
 						iocap=self.inputOutputCapability,
 						oob=1 if self.outOfBand else 0,
 						authentication=self.authentication,

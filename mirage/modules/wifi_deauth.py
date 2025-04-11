@@ -1,4 +1,5 @@
-from scapy.all import *
+#from scapy.all import *
+from scapy.layers.dot11 import *
 from mirage.core import module
 from mirage.libs import utils,io,wifi
 

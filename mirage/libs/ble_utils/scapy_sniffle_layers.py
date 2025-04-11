@@ -1,4 +1,6 @@
-from scapy.all import *
+from scapy.layers.bluetooth import *;from scapy.layers.bluetooth4LE import *
+from scapy.fields import *
+from scapy.packet import Packet
 
 class SniffleCommand(Packet):
 	name = "Sniffle Command Packet"

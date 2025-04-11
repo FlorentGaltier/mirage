@@ -1,4 +1,6 @@
-from scapy.all import *
+#from scapy.all import *
+from scapy.layers.bluetooth import *
+from scapy.layers.bluetooth4LE import *
 from mirage.core.module import WirelessModule
 from mirage.libs.ble_utils.scapy_hci_layers import *
 from mirage.libs.ble_utils.packets import *
@@ -11,6 +13,7 @@ from mirage.libs.ble_utils.butterfly import *
 from mirage.libs.ble_utils.adb import *
 from mirage.libs.ble_utils.hcidump import *
 from mirage.libs.ble_utils.hackrf import *
+from mirage.libs.ble_utils.soapy import *
 from mirage.libs.ble_utils.sniffle import *
 from mirage.libs.ble_utils.pcap import *
 from mirage.libs.ble_utils.helpers import *
@@ -20,7 +23,6 @@ from mirage.libs.ble_utils.dissectors import *
 from mirage.libs.ble_utils.att_server import *
 from mirage.libs import wireless,bt,io
 
-
 class BLEHCIDevice(bt.BtHCIDevice):
 	'''
 	This device allows to communicate with an HCI Device in order to use Bluetooth Low Energy protocol.
@@ -29,39 +31,39 @@ class BLEHCIDevice(bt.BtHCIDevice):
 	The following capabilities are actually supported :
 
 	+-----------------------------------+----------------+
-	| Capability                        | Available ?    |
+	| Capability						| Available ?	|
 	+===================================+================+
-	| SCANNING                          | yes            |
+	| SCANNING						  | yes			|
 	+-----------------------------------+----------------+
-	| ADVERTISING                       | yes            |
+	| ADVERTISING					   | yes			|
 	+-----------------------------------+----------------+
-	| SNIFFING_ADVERTISEMENTS           | no             |
+	| SNIFFING_ADVERTISEMENTS		   | no			 |
 	+-----------------------------------+----------------+
-	| SNIFFING_NEW_CONNECTION           | no             |
+	| SNIFFING_NEW_CONNECTION		   | no			 |
 	+-----------------------------------+----------------+
-	| SNIFFING_EXISTING_CONNECTION      | no             |
+	| SNIFFING_EXISTING_CONNECTION	  | no			 |
 	+-----------------------------------+----------------+
-	| JAMMING_CONNECTIONS               | no             |
+	| JAMMING_CONNECTIONS			   | no			 |
 	+-----------------------------------+----------------+
-	| JAMMING_ADVERTISEMENTS            | no             |
+	| JAMMING_ADVERTISEMENTS			| no			 |
 	+-----------------------------------+----------------+
-	| HIJACKING_MASTER                  | no             |
+	| HIJACKING_MASTER				  | no			 |
 	+-----------------------------------+----------------+
-	| HIJACKING_SLAVE                   | no             |
+	| HIJACKING_SLAVE				   | no			 |
 	+-----------------------------------+----------------+
-	| INJECTING                         | no             |
+	| INJECTING						 | no			 |
 	+-----------------------------------+----------------+
-	| MITMING_EXISTING_CONNECTION       | no             |
+	| MITMING_EXISTING_CONNECTION	   | no			 |
 	+-----------------------------------+----------------+
-	| INITIATING_CONNECTION             | yes            |
+	| INITIATING_CONNECTION			 | yes			|
 	+-----------------------------------+----------------+
-	| RECEIVING_CONNECTION              | yes            |
+	| RECEIVING_CONNECTION			  | yes			|
 	+-----------------------------------+----------------+
-	| COMMUNICATING_AS_MASTER           | yes            |
+	| COMMUNICATING_AS_MASTER		   | yes			|
 	+-----------------------------------+----------------+
-	| COMMUNICATING_AS_SLAVE            | yes            |
+	| COMMUNICATING_AS_SLAVE			| yes			|
 	+-----------------------------------+----------------+
-	| HCI_MONITORING                    | no             |
+	| HCI_MONITORING					| no			 |
 	+-----------------------------------+----------------+
 
 	'''
@@ -127,9 +129,15 @@ class BLEHCIDevice(bt.BtHCIDevice):
 		self._enterCommandMode()
 		self._internalCommand(HCI_Cmd_Reset())
 		self._internalCommand(HCI_Cmd_Set_Event_Filter())
-		self._internalCommand(HCI_Cmd_Connect_Accept_Timeout())
+		if SCAPY_VERSION>=VERSION_2_5_0 and SCAPY_VERSION<VERSION_2_6_0:
+			self._internalCommand(HCI_Cmd_Connect_Accept_Timeout())
+		elif SCAPY_VERSION>=VERSION_2_6_0 and SCAPY_VERSION<VERSION_2_7_0:
+			self._internalCommand(HCI_Cmd_Write_Connect_Accept_Timeout())
 		self._internalCommand(HCI_Cmd_Set_Event_Mask())
-		self._internalCommand(HCI_Cmd_LE_Host_Supported())
+		if SCAPY_VERSION>=VERSION_2_5_0 and SCAPY_VERSION<VERSION_2_6_0:
+			self._internalCommand(HCI_Cmd_LE_Host_Supported())
+		elif SCAPY_VERSION>=VERSION_2_6_0 and SCAPY_VERSION<VERSION_2_7_0:
+			self._internalCommand(HCI_Cmd_Write_LE_Host_Support())
 		self._exitCommandMode()
 
 		self.capabilities = ["SCANNING", "ADVERTISING", "INITIATING_CONNECTION", "RECEIVING_CONNECTION", "COMMUNICATING_AS_MASTER", "COMMUNICATING_AS_SLAVE"]
@@ -351,7 +359,10 @@ class BLEHCIDevice(bt.BtHCIDevice):
 			else:
 				advData = data+(31 - len(data))*b"\x00"
 
-			self._internalCommand(New_HCI_Cmd_LE_Set_Scan_Response_Data(data=advData,len=len(data)))
+			if SCAPY_VERSION>=VERSION_2_5_0 and SCAPY_VERSION<VERSION_2_6_0:
+				self._internalCommand(New_HCI_Cmd_LE_Set_Scan_Response_Data(data=advData,len=len(data)))
+			elif SCAPY_VERSION>=VERSION_2_6_0 and SCAPY_VERSION<VERSION_2_7_0:
+				self._internalCommand(HCI_Cmd_LE_Set_Scan_Response_Data(data=advData,len=len(data)))
 		self._exitCommandMode()
 
 	def setAdvertisingParameters(self,type = "ADV_IND",destAddr = "00:00:00:00:00:00",data = b"",intervalMin = 200, intervalMax = 210, daType='public', oaType='public'):
@@ -410,7 +421,10 @@ class BLEHCIDevice(bt.BtHCIDevice):
 				advData = data+(31 - len(data))*b"\x00"
 
 		self._internalCommand(HCI_Cmd_LE_Set_Advertising_Parameters(adv_type=advType, daddr=dAddr, datype=daType, oatype=oaType,interval_min=intervalMin, interval_max = intervalMax))
-		self._internalCommand(New_HCI_Cmd_LE_Set_Advertising_Data(data=EIR_Hdr(advData)))
+		if SCAPY_VERSION>=VERSION_2_5_0 and SCAPY_VERSION<VERSION_2_6_0:
+			self._internalCommand(New_HCI_Cmd_LE_Set_Advertising_Data(data=EIR_Hdr(advData)))
+		elif SCAPY_VERSION>=VERSION_2_6_0 and SCAPY_VERSION<VERSION_2_7_0:
+			self._internalCommand(HCI_Cmd_LE_Set_Advertising_Data(data=EIR_Hdr(advData)))
 		self._exitCommandMode()
 
 	def _setAddressMode(self,mode="public"):
@@ -487,6 +501,7 @@ class BLEHCIDevice(bt.BtHCIDevice):
 		encryptionChange = self.socket.recv()
 		while encryptionChange is None or HCI_Event_Encryption_Change not in encryptionChange:
 			if encryptionChange is not None:
+				#self.pendingQueue.appendleft(encryptionChange)
 				self.pendingQueue.put(encryptionChange, block=True)
 			encryptionChange = self.socket.recv()
 		self._exitCommandMode()
@@ -508,23 +523,25 @@ class BLEEmitter(wireless.Emitter):
 	'''
 	def __init__(self, interface="hci0"):
 		deviceClass = None
-		if "hcidump" in interface:
+		if interface.startswith("hcidump"):
 			deviceClass = BLEHcidumpDevice
-		elif "hci" in interface:
+		elif interface.startswith("hci"):
 			deviceClass = BLEHCIDevice
-		elif "ubertooth" in interface:
+		elif interface.startswith("ubertooth"):
 			deviceClass = BLEUbertoothDevice
-		elif "microbit" in interface:
+		elif interface.startswith("microbit"):
 			deviceClass = BTLEJackDevice
-		elif "adb" in interface:
+		elif interface.startswith("adb"):
 			deviceClass = ADBDevice
-		elif "nrfsniffer" in interface:
+		elif interface.startswith("nrfsniffer"):
 			deviceClass = NRFSnifferDevice
-		elif "hackrf" in interface:
+		elif interface.startswith("soapy"):
+			deviceClass = BLESoapyDevice
+		elif interface.startswith("hackrf"):
 			deviceClass = BLEHackRFDevice
-		elif "sniffle" in interface:
+		elif interface.startswith("sniffle"):
 			deviceClass = SniffleDevice
-		elif "butterfly" in interface:
+		elif interface.startswith("butterfly"):
 			if ":sub" in interface:
 				deviceClass = BLEButterflySubdevice
 			else:
@@ -534,20 +551,26 @@ class BLEEmitter(wireless.Emitter):
 		super().__init__(interface=interface, packetType=BLEPacket, deviceType=deviceClass)
 
 	def convert(self,packet):
+		dt=self.deviceType
+		pt=type(packet)
 
 		if packet.packet is None:
 			if isinstance(packet,BLEEncryptedPacket):
 					packet.packet = BTLE() / BTLE_DATA(packet.data)
 			else:
 				# Specific sublayers
-				if "hci" in self.interface:
+				#if "hci" in self.interface:
+				if dt==BLEHCIDevice:
 					packet.packet = HCI_Hdr()
 					if isinstance(packet,BLEConnect):
 						self.device._setAddressMode(packet.initiatorType)
 						packet.packet /= HCI_Command_Hdr()/HCI_Cmd_LE_Create_Connection(
 											paddr=packet.dstAddr,
 											patype=packet.type,
-											atype=packet.initiatorType)
+											atype=packet.initiatorType)#,
+											#interval=packet.interval,
+											#min_interval=packet.interval,
+											#max_interval=packet.interval)
 					elif isinstance(packet,BLEConnectionCancel):
 						packet.packet /= HCI_Command_Hdr()/HCI_Cmd_LE_Create_Connection_Cancel()
 					else:
@@ -574,14 +597,14 @@ class BLEEmitter(wireless.Emitter):
 
 				else:
 					packet.packet = BTLE()
-					if isinstance(packet,BLEConnect) and "sniffle" in self.interface:
+					if isinstance(packet,BLEConnect) and dt==SniffleDevice:#"sniffle" in self.interface:
 						packet.packet /= (BTLE_ADV(TxAdd=0x00 if packet.initiatorType == "public" else 0x01,
 												  RxAdd=0x00 if packet.type == "public" else 0x01)/
 										BTLE_CONNECT_REQ(
-										AdvA=packet.dstAddr
+										AdvA=packet.dstAddr, interval=packet.interval
 						))
 
-					if isinstance(packet, BLEAdvertisement):
+					if isinstance(packet,BLEAdvertisement):
 						packet.packet /= BTLE_ADV(RxAdd=0x00 if packet.addrType == "public" else 0x01)
 						advType = packet.type
 						if advType == "ADV_IND":
@@ -668,7 +691,7 @@ class BLEEmitter(wireless.Emitter):
 
 					if (
 						isinstance(packet,BLEConnectionParameterUpdateRequest) or
-					     	isinstance(packet,BLEConnectionParameterUpdateResponse)
+						 	isinstance(packet,BLEConnectionParameterUpdateResponse)
 					   ):
 							packet.packet /= L2CAP_Hdr()/L2CAP_CmdHdr(id=packet.l2capCmdId)
 					elif (
@@ -711,9 +734,12 @@ class BLEEmitter(wireless.Emitter):
 								max_key_size = packet.maxKeySize,
 								initiator_key_distribution=packet.initiatorKeyDistribution,
 								responder_key_distribution = packet.responderKeyDistribution)
+						#print("Convert Pairing Request")
+						#packet.packet.show()
 
 
 					elif isinstance(packet,BLEPairingResponse):
+						#packet.show()
 						packet.packet /= SM_Pairing_Response(
 								iocap=packet.inputOutputCapability,
 								oob=1 if packet.outOfBand else 0,
@@ -721,6 +747,8 @@ class BLEEmitter(wireless.Emitter):
 								max_key_size = packet.maxKeySize,
 								initiator_key_distribution=packet.initiatorKeyDistribution,
 								responder_key_distribution = packet.responderKeyDistribution)
+						#print("Convert Pairing Response")
+						#packet.packet.show()
 
 					elif isinstance(packet,BLEPairingFailed):
 						packet.packet /= SM_Failed(reason=packet.reason)
@@ -749,13 +777,13 @@ class BLEEmitter(wireless.Emitter):
 					elif isinstance(packet,BLESigningInformation):
 						packet.packet /= SM_Signing_Information(csrk=packet.csrk)
 
-					elif isinstance(packet, BLEFindByTypeValueRequest):
+					elif isinstance(packet,BLEFindByTypeValueRequest):
 						packet.packet /= ATT_Find_By_Type_Value_Request(start=packet.startHandle,
 																		end=packet.endHandle,
 																		uuid=packet.uuid,
 																		data=packet.data)
 
-					elif isinstance(packet, BLEFindByTypeValueResponse):
+					elif isinstance(packet,BLEFindByTypeValueResponse):
 						packet.packet /= ATT_Find_By_Type_Value_Response(handles=packet.handles)
 
 					elif isinstance(packet,BLEErrorResponse):
@@ -818,7 +846,9 @@ class BLEEmitter(wireless.Emitter):
 						packet.packet /= ATT_Read_Response(value=packet.value)
 
 
-		if self.interface[-5:] == ".pcap" and packet.additionalInformations is not None:
+		#packet.packet.show()
+		#if self.interface[-5:] == ".pcap" and packet.additionalInformations is not None:
+		if dt==BLEPCAPDevice and packet.additionalInformations is not None:
 			packet.packet = BTLE_PPI(
 					rssi_count = packet.additionalInformations.rssi_count,
 					rssi_avg = packet.additionalInformations.rssi_avg,
@@ -830,7 +860,6 @@ class BLEEmitter(wireless.Emitter):
 
 
 		return packet.packet
-
 
 class BLEReceiver(wireless.Receiver):
 	'''
@@ -849,26 +878,28 @@ class BLEReceiver(wireless.Receiver):
 	def __init__(self,interface="hci0"):
 		deviceClass = None
 		self.encrypted = False
-		if "hcidump" in interface:
+		if interface.startswith("hcidump"):
 			deviceClass = BLEHcidumpDevice
-		elif "hci" in interface:
+		elif interface.startswith("hci"):
 			deviceClass = BLEHCIDevice
-		elif "ubertooth" in interface:
+		elif interface.startswith("ubertooth"):
 			deviceClass = BLEUbertoothDevice
-		elif "microbit" in interface:
+		elif interface.startswith("microbit"):
 			deviceClass = BTLEJackDevice
-		elif "hackrf" in interface:
+		elif interface.startswith("hackrf"):
 			deviceClass = BLEHackRFDevice
-		elif "adb" in interface:
+		elif interface.startswith("soapy"):
+			deviceClass = BLESoapyDevice
+		elif interface.startswith("adb"):
 			deviceClass = ADBDevice
-		elif "butterfly" in interface:
+		elif interface.startswith("butterfly"):
 			if ":sub" in interface:
 				deviceClass = BLEButterflySubdevice
 			else:
 				deviceClass = BLEButterflyDevice
-		elif "sniffle" in interface:
+		elif interface.startswith("sniffle"):
 			deviceClass = SniffleDevice
-		elif "nrfsniffer" in interface:
+		elif interface.startswith("nrfsniffer"):
 			deviceClass = NRFSnifferDevice
 		elif interface[-5:] == ".pcap":
 			deviceClass = BLEPCAPDevice
@@ -887,7 +918,12 @@ class BLEReceiver(wireless.Receiver):
 			self.device._exitListening()
 
 	def convert(self,packet):
-		if "hackrf" in self.interface:
+		#if "hackrf" in self.interface:
+		dt=self.deviceType
+		if dt==BLEHackRFDevice:
+			packet, iqSamples = packet
+		#elif "soapy" in self.interface:
+		elif dt==BLESoapyDevice:
 			packet, iqSamples = packet
 		cryptoInstance = BLELinkLayerCrypto.getInstance()
 		if cryptoInstance is not None and cryptoInstance.ready and BTLE_DATA in packet and packet.LLID > 1:
@@ -896,7 +932,8 @@ class BLEReceiver(wireless.Receiver):
 				packet[BTLE_DATA] = BTLE_DATA(plain)
 		new = BLEPacket()
 		new.packet = packet
-		if "hci" in self.interface or "adb" in self.interface:
+		if dt==BLEHCIDevice or dt==ADBDevice:
+		#if "hci" in self.interface or "adb" in self.interface:
 			#packet.show()
 
 			# Here, we have a start of fragmented HCI packet (L2CAP length > HCI length)
@@ -908,7 +945,7 @@ class BLEReceiver(wireless.Receiver):
 				return None
 
 			# Here, we have the next fragment (PB = 1)
-			if packet.type == TYPE_ACL_DATA and packet.PB == 1 and L2CAP_Hdr in packet and len(self.fragmentBuffer) > 0:
+			elif packet.type == TYPE_ACL_DATA and packet.PB == 1 and L2CAP_Hdr in packet and len(self.fragmentBuffer) > 0:
 				# We create the scapy packet before the last fragment
 				previousPacket = HCI_Hdr(self.fragmentBuffer)
 				# We concatenate it to the previous fragments
@@ -1039,20 +1076,26 @@ class BLEReceiver(wireless.Receiver):
 							authentication = packet.authentication)
 
 				elif SM_Pairing_Request in packet:
+					#print("Convert SM_Pairing_Request")
+					#packet.show()
 					return BLEPairingRequest(
 						connectionHandle = packet.handle,
 						inputOutputCapability=packet.iocap,
 						outOfBand=packet.oob == 1,
+						maxKeySize=packet.max_key_size,
 						authentication=packet.authentication,
 						initiatorKeyDistribution=packet.initiator_key_distribution,
 						responderKeyDistribution=packet.responder_key_distribution,
 						payload=raw(packet[SM_Hdr:]))
 
 				elif SM_Pairing_Response in packet:
+					#print("Convert SM_Pairing_Response")
+					#packet.show()
 					return BLEPairingResponse(
 						connectionHandle = packet.handle,
 						inputOutputCapability=packet.iocap,
 						outOfBand=packet.oob == 1,
+						maxKeySize=packet.max_key_size,
 						authentication=packet.authentication,
 						initiatorKeyDistribution=packet.initiator_key_distribution,
 						responderKeyDistribution=packet.responder_key_distribution,
@@ -1217,18 +1260,20 @@ class BLEReceiver(wireless.Receiver):
 					return BLEDisconnect(connectionHandle=handle)
 				else:
 					return None
-		elif (	"hackrf" in self.interface or
-				"butterfly" in self.interface or
-				"ubertooth" in self.interface or
- 				"microbit" in self.interface or
-				"nrfsniffer" in self.interface or
-				"sniffle" in self.interface or
- 				self.interface[-5:] == ".pcap"):
+		elif dt in [BLEHackRFDevice, BLESoapyDevice, BLEButterflyDevice, BLEButterflySubdevice, BLEUbertoothDevice, BTLEJackDevice, NRFSnifferDevice, SniffleDevice, BLEPCAPDevice]:
+		#elif (	"hackrf" in self.interface or
+		#		"soapy" in self.interface or
+		#		"butterfly" in self.interface or
+		#		"ubertooth" in self.interface or
+ 		#		"microbit" in self.interface or
+		#		"nrfsniffer" in self.interface or
+		#		"sniffle" in self.interface or
+ 		#		self.interface[-5:] == ".pcap"):
 			try:
-				if ((cryptoInstance is None) or (cryptoInstance is not None and not cryptoInstance.ready)) and self.encrypted:
+				#if ((cryptoInstance is None) or (cryptoInstance is not None and not cryptoInstance.ready)) and self.encrypted:
+				if ((cryptoInstance is None) or (not cryptoInstance.ready)) and self.encrypted:
 					new = BLEEncryptedPacket(connectionHandle = 1, data = bytes(packet[BTLE_DATA]))
 				else:
-
 					if BTLE_ADV in packet:
 						if BTLE_CONNECT_REQ in packet:
 
@@ -1415,6 +1460,9 @@ class BLEReceiver(wireless.Receiver):
 								initiatorKeyDistribution=packet.initiator_key_distribution,
 								responderKeyDistribution=packet.responder_key_distribution,
 								payload=raw(packet[SM_Hdr:]))
+							#print("on continue")
+							#packet.show()
+							#new.show()
 
 						elif SM_Pairing_Response in packet:
 							new = BLEPairingResponse(
@@ -1424,6 +1472,9 @@ class BLEReceiver(wireless.Receiver):
 								initiatorKeyDistribution=packet.initiator_key_distribution,
 								responderKeyDistribution=packet.responder_key_distribution,
 								payload=raw(packet[SM_Hdr:]))
+							#print("on continue")
+							#packet.show()
+							#new.show()
 
 						elif SM_Failed in packet:
 							new = BLEPairingFailed(reason=packet.reason)
@@ -1477,6 +1528,7 @@ class BLEReceiver(wireless.Receiver):
 								moveResult=packet.move_result
 								)
 					elif packet.LLID == 3:
+						#packet.show()
 
 						try:
 							controlType = CONTROL_TYPES[packet.opcode]
@@ -1507,7 +1559,8 @@ class BLEReceiver(wireless.Receiver):
 			except:
 				new = BLEPacket()
 				new.packet = packet
-			if "ubertooth" in self.interface:
+			#if "ubertooth" in self.interface:
+			if dt==BLEUbertoothDevice:
 				new.additionalInformations = BLESniffingParameters(
 									rssi_min = packet.rssi_min,
 									rssi_max = packet.rssi_max,
@@ -1517,7 +1570,8 @@ class BLEReceiver(wireless.Receiver):
 									clk_100ns=packet.clk_100ns,
 									clkn_high=packet.clkn_high
 									)
-			elif "microbit" in self.interface:
+			elif dt==BTLEJackDevice:
+			#elif "microbit" in self.interface:
 
 				new.additionalInformations = BLESniffingParameters(
 									rssi = packet.rssi_avg,
@@ -1526,7 +1580,8 @@ class BLEReceiver(wireless.Receiver):
 									clkn_high = packet.btle_clkn_high,
 									channel = packet.btle_channel
 									)
-			elif "hackrf" in self.interface:
+			elif dt==BLEHackRFDevice:
+			#elif "hackrf" in self.interface:
 
 				new.additionalInformations = BLESniffingParameters(
 									rssi = packet.rssi_avg,
@@ -1535,7 +1590,18 @@ class BLEReceiver(wireless.Receiver):
 									clkn_high = packet.btle_clkn_high,
 									channel = packet.btle_channel
 									)
-			elif "butterfly" in self.interface:
+			elif dt==BLESoapyDevice:
+			#elif "soapy" in self.interface:
+
+				new.additionalInformations = BLESniffingParameters(
+									rssi = packet.rssi_avg,
+									rssi_count = packet.rssi_count,
+									clk_100ns = packet.btle_clk_100ns,
+									clkn_high = packet.btle_clkn_high,
+									channel = packet.btle_channel
+									)
+			elif dt==BLEButterflyDevice or dt==BLEButterflySubdevice:
+			#elif "butterfly" in self.interface:
 
 				new.additionalInformations = BLESniffingParameters(
 									rssi = packet.rssi_avg,
@@ -1546,7 +1612,8 @@ class BLEReceiver(wireless.Receiver):
 									rawPacket = bytes(packet[BTLE:])
 									)
 
-			elif "sniffle" in self.interface:
+			elif dt==SniffleDevice:
+			#elif "sniffle" in self.interface:
 
 				new.additionalInformations = BLESniffingParameters(
 									rssi = packet.rssi_avg,
@@ -1555,7 +1622,8 @@ class BLEReceiver(wireless.Receiver):
 									clkn_high = packet.btle_clkn_high,
 									channel = packet.btle_channel
 									)
-			elif "nrfsniffer" in self.interface:
+			elif dt==NRFSnifferDevice:
+			#elif "nrfsniffer" in self.interface:
 
 				new.additionalInformations = BLESniffingParameters(
 									rssi = packet.rssi_avg,
@@ -1564,7 +1632,8 @@ class BLEReceiver(wireless.Receiver):
 									clkn_high = packet.btle_clkn_high,
 									channel = packet.btle_channel
 									)
-			elif ".pcap" in self.interface:
+			elif dt==BLEPCAPDevice:
+			#elif ".pcap" in self.interface:
 				new.additionalInformations = BLESniffingParameters(
 									rssi = packet.rssi_avg,
 									rssi_count = packet.rssi_count,

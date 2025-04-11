@@ -1,4 +1,5 @@
 from queue import Queue,Empty
+from collections import deque
 import time
 import mirage.libs.io as io
 from mirage.libs.wireless_utils.packets import *
@@ -7,6 +8,8 @@ from mirage.libs.wireless_utils.callbacks import Callback
 from mirage.libs.wireless_utils.device import Device,SDRDevice
 from mirage.libs.wireless_utils.pcapDevice import PCAPDevice
 from mirage.libs.wireless_utils.butterfly import ButterflyDevice
+
+import importlib
 
 class Emitter(PacketQueue):
 	'''
@@ -87,16 +90,21 @@ class Emitter(PacketQueue):
 		if not self.isEmpty():
 			self.transmitting = True
 			packet = self.queue.get()
-			if isinstance(packet,WaitPacket):
+			#self.queue_size-=1
+			#packet = self.queue.pop()
+			#if isinstance(packet,WaitPacket):
+			if type(packet)==WaitPacket:
 				data = bytes("WAIT:"+str(packet.time),"ascii")
 			else:
 				data = self.convert(packet)
-
 			if data is not None:
 				self._send(data)
 			self.transmitting = not self.isEmpty()
 		else:
 			time.sleep(0.005)
+			#time.sleep(0.000001)
+			#time.sleep(0.1)
+			#pass
 
 
 	def send(self,*packets):
@@ -113,6 +121,8 @@ class Emitter(PacketQueue):
 
 		'''
 		for packet in packets:
+			#self.queue.appendleft(packet)
+			#self.queue_size+=1
 			self.queue.put(packet)
 
 	def sendp(self,*packets):
@@ -137,9 +147,6 @@ class Emitter(PacketQueue):
 		if self.isDeviceUp():
 			self.device.close()
 
-
-
-
 class Receiver(PacketQueue):
 	'''
 	This class allows an user to communicate with a device in order to receive data. Indeed, Mirage provides no direct access to the device component from the modules : the hardware components are manipulated thanks to the Emitter class and the Receiver class. Receivers' classes for a given technology inherits from this class.
@@ -162,9 +169,13 @@ class Receiver(PacketQueue):
 		self.packetType = packetType
 		self.deviceType = deviceType
 		self.device = self.deviceType.get(self.interface)
-		self.callbacks = []
+		self.instanceof_events=set()
+		self.npackets_counter=0
+		self.npackets_events=set()
+		self.callbacks={}
 		self.receiving = False
 		self.callbacksQueue = Queue()
+		#self.callbacksQueue = deque()
 		self.callbacksActiveListening = False
 		super().__init__(waitEmpty=False, autoStart=True)
 
@@ -199,8 +210,11 @@ class Receiver(PacketQueue):
 	def _add(self,data):
 		if data is not None:
 			packet = self.convert(data)
-			self._executeCallbacks(packet)
+			#self._executeCallbacks(packet)
 			if packet is not None:
+				self._executeCallbacks(packet)
+				#self.queue.appendleft(packet)
+				#self.queue_size+=1
 				self.queue.put(packet)
 
 	def isReceiving(self):
@@ -219,6 +233,9 @@ class Receiver(PacketQueue):
 	def _task(self):
 		self.receiving = True
 		pkt = self.device.recv()
+		#if pkt is not None:
+			#print("DEBUG _task", pkt)
+			#pkt.show()
 		self._add(pkt)
 		self.receiving = False
 
@@ -300,7 +317,10 @@ class Receiver(PacketQueue):
 		def get():
 			try:
 				return self.queue.get(timeout=timeout)
-			except Empty:
+				#res=self.queue.pop()#(timeout=timeout)
+				#self.queue_size-=1
+				#return res
+			except:# Empty:
 				return None
 
 		if loop:
@@ -323,13 +343,13 @@ class Receiver(PacketQueue):
 		Some examples are represented in the following table:
 
 		+----------------------+-------------------------------+
-		| Event                |  Description                  |
+		| Event				|  Description				  |
 		+======================+===============================+
-		| \*                   |  every packet                 |
+		| \*				   |  every packet				 |
 		+----------------------+-------------------------------+
-		| 3                    |  every 3 packets              |
+		| 3					|  every 3 packets			  |
 		+----------------------+-------------------------------+
-		| BLEReadRequest       |  every BLE Read Request       |
+		| BLEReadRequest	   |  every BLE Read Request	   |
 		+----------------------+-------------------------------+
 
 		The function *callback* is called with the following format : callback(packet,*args,**kwargs)
@@ -356,16 +376,68 @@ class Receiver(PacketQueue):
 			>>> receiver.onEvent("BLEReadRequest",callback=onReadRequest, args=["Romain"])
 
 		'''
-		self.callbacks.append(Callback(event=event, function=callback, args=args, kwargs=kwargs, background=background))
+		is_int=False
+		if event.isdigit():
+			is_int=True
+			event=int(event)
+		if event not in self.callbacks:
+			self.callbacks[event]=[]
+			if event=="*" or is_int:
+				self.npackets_events.add(event)
+			else:
+				self.instanceof_events.add(event)
+		self.callbacks[event].append(Callback(event=event,function=callback,args=args,kwargs=kwargs,background=background))
+		#self.callbacks.append(Callback(event=event, function=callback, args=args, kwargs=kwargs, background=background))
+
+	def _updateEvents(self, packet):
+		if self.instanceof_events:
+			#pt=packet.__class__.__name__
+			pt=packet.__class__
+			m=importlib.import_module(packet.__module__)
+			#if pt in self.instanceof_events:
+			for pt2 in self.instanceof_events:
+				if issubclass(pt, getattr(m,pt2)):
+					for callback in self.callbacks[pt2]:
+						if callback.background:
+							callback.run(packet)
+						else:
+							#self.callbacksQueue.appendleft((callback,packet))
+							self.callbacksQueue.put((callback,packet))
+		if self.npackets_events:
+			self.npackets_counter+=1
+			for key in self.npackets_events:
+				if key=="*":
+					for callback in self.callbacks["*"]:
+						if callback.background:
+							callback.run(packet)
+						else:
+							#self.callbacksQueue.appendleft((callback,packet))
+							self.callbacksQueue.put((callback,packet))
+				else:
+					if self.npackets_counter%key==0:
+						for callback in self.callbacks[key]:
+							if callback.background:
+								callback.run(packet)
+							else:
+								#self.callbacksQueue.appendleft((callback,packet))
+								self.callbacksQueue.put((callback,packet))
+
 
 	def _executeCallbacks(self,packet):
-		for callback in self.callbacks:
-			callback.update(packet)
-			if callback.runnable:
-				if callback.background:
-					callback.run(packet)
-				else:
-					self.callbacksQueue.put((self.callbacks.index(callback),packet))
+		#import time
+		#d=time.time()
+		self._updateEvents(packet)
+		#for callback in self.callbacks:
+		#	callback.update(packet)
+		#	if callback.runnable:
+		#		if callback.background:
+		#			callback.run(packet)
+		#		else:
+		#			#self.callbacksQueue.put((self.callbacks.index(callback),packet))
+		#			self.callbacksQueue.appendleft((self.callbacks.index(callback),packet))
+		#f=time.time()-d
+		#print(f"_executeCallbacks m'a fait perdre {f}s")
+
 
 	def stopListeningCallbacks(self):
 		'''
@@ -390,14 +462,20 @@ class Receiver(PacketQueue):
 		self.callbacksActiveListening = True
 		while self.callbacksActiveListening:
 			if not self.callbacksQueue.empty():
-				index,packet = self.callbacksQueue.get()
-				self.callbacks[index].run(packet)
+			#if len(self.callbacksQueue)>0:
+				#index,packet = self.callbacksQueue.get()
+				callback,packet = self.callbacksQueue.get()
+				#callback,packet = self.callbacksQueue.pop()
+				callback.run(packet)
 
 	def removeCallbacks(self):
 		'''
 		Remove the callbacks attached to the Receiver.
 		'''
-		self.callbacks = []
+		self.instanceof_events=set()
+		self.npackets_counter=0
+		self.npackets_events=set()
+		self.callbacks={}
 
 	def stop(self):
 		'''

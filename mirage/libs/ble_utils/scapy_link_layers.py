@@ -1,4 +1,5 @@
-from scapy.all import *
+from scapy.fields import *
+from scapy.packet import Packet
 
 '''
 This module contains some scapy definitions of Link Layer Bluetooth Low Energy packets.

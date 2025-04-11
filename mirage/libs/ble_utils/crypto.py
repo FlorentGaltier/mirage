@@ -14,10 +14,16 @@ class BLECrypto:
 
 	'''
 
-	temporaryKeys = [bytes.fromhex((32-len(hex(i)[2:]))*"0"+hex(i)[2:]) for i in range(1000000)]	
+	temporaryKeys = None#[bytes.fromhex((32-len(hex(i)[2:]))*"0"+hex(i)[2:]) for i in range(1000000)]
+
+	@classmethod
+	def _initTemporaryKeys(cls):
+		cls.temporaryKeys = [bytes.fromhex((32-len(hex(i)[2:]))*"0"+hex(i)[2:]) for i in range(1000000)]
 
 	@classmethod
 	def _findKey(cls,L,pMin,pMax,r,pres,preq,iat,ia,rat,ra,confirm):
+		if cls.temporaryKeys is None:
+			cls._initTemporaryKeys()
 		i = pMin
 		p1 = pres + preq + rat + iat
 		p2 = b"\x00\x00\x00\x00" + ia + ra

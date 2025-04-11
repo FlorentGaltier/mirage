@@ -1,5 +1,5 @@
 from struct import pack,unpack
-from scapy.all import *
+from scapy.layers.bluetooth import *;from scapy.layers.bluetooth4LE import *
 from mirage.libs.wireless_utils.pcapDevice import PCAPDevice
 from mirage.libs.ble_utils.packets import *
 from mirage.libs.ble_utils.constants import *
@@ -20,39 +20,39 @@ class BLEPCAPDevice(wireless.PCAPDevice):
 	The following capabilities are actually supported :
 
 	+-----------------------------------+----------------+
-	| Capability                        | Available ?    |
+	| Capability						| Available ?	|
 	+===================================+================+
-	| SCANNING                          | no             |
+	| SCANNING						  | no			 |
 	+-----------------------------------+----------------+
-	| ADVERTISING                       | no             |
+	| ADVERTISING					   | no			 |
 	+-----------------------------------+----------------+
-	| SNIFFING_ADVERTISEMENTS           | yes            |
+	| SNIFFING_ADVERTISEMENTS		   | yes			|
 	+-----------------------------------+----------------+
-	| SNIFFING_NEW_CONNECTION           | yes            |
+	| SNIFFING_NEW_CONNECTION		   | yes			|
 	+-----------------------------------+----------------+
-	| SNIFFING_EXISTING_CONNECTION      | no             |
+	| SNIFFING_EXISTING_CONNECTION	  | no			 |
 	+-----------------------------------+----------------+
-	| JAMMING_CONNECTIONS               | no             |
+	| JAMMING_CONNECTIONS			   | no			 |
 	+-----------------------------------+----------------+
-	| JAMMING_ADVERTISEMENTS            | no             |
+	| JAMMING_ADVERTISEMENTS			| no			 |
 	+-----------------------------------+----------------+
-	| HIJACKING_MASTER                  | no             |
+	| HIJACKING_MASTER				  | no			 |
 	+-----------------------------------+----------------+
-	| HIJACKING_SLAVE                   | no             |
+	| HIJACKING_SLAVE				   | no			 |
 	+-----------------------------------+----------------+
-	| INJECTING                         | no             |
+	| INJECTING						 | no			 |
 	+-----------------------------------+----------------+
-	| MITMING_EXISTING_CONNECTION       | no             |
+	| MITMING_EXISTING_CONNECTION	   | no			 |
 	+-----------------------------------+----------------+
-	| INITIATING_CONNECTION             | no             |
+	| INITIATING_CONNECTION			 | no			 |
 	+-----------------------------------+----------------+
-	| RECEIVING_CONNECTION              | no             |
+	| RECEIVING_CONNECTION			  | no			 |
 	+-----------------------------------+----------------+
-	| COMMUNICATING_AS_MASTER           | no             |
+	| COMMUNICATING_AS_MASTER		   | no			 |
 	+-----------------------------------+----------------+
-	| COMMUNICATING_AS_SLAVE            | no             |
+	| COMMUNICATING_AS_SLAVE			| no			 |
 	+-----------------------------------+----------------+
-	| HCI_MONITORING                    | no             |
+	| HCI_MONITORING					| no			 |
 	+-----------------------------------+----------------+
 
 	.. warning::
@@ -323,33 +323,40 @@ class BLEPCAPDevice(wireless.PCAPDevice):
 			self.synchronized = False
 
 	def send(self,packet):
-		if self.mode == "write":
-			timestamp = int(packet.btle_clkn_high) + (packet.btle_clk_100ns/ 1000000)
+		try:
+			if self.mode == "write":
+				timestamp = int(packet.btle_clkn_high) + (packet.btle_clk_100ns/ 1000000)
 
-			if self.sniffingMode == BLESniffingMode.ADVERTISEMENT:
-				if BTLE_ADV not in packet or (hasattr(packet,"AdvA") and self.target != packet.AdvA.upper() and self.target != "FF:FF:FF:FF:FF:FF"):
+				if self.sniffingMode == BLESniffingMode.ADVERTISEMENT:
+					if BTLE_ADV not in packet or (hasattr(packet,"AdvA") and (packet.AdvA == None or self.target != packet.AdvA.upper()) and self.target != "FF:FF:FF:FF:FF:FF" and self.target != None):
+						return
+					wrpcap(self.filename, packet[BTLE], append=True)
 					return
 
-			else:
+				else:
 
-				if BTLE_CONNECT_REQ in packet:
-					aa = unpack(">I",pack("<I",packet.AA))[0]
-					self._setAccessAddress(aa)
-					self._setCrcInit(packet.crc_init)
-					self._setChannelMap(packet.chM)
-					self._setHopInterval(packet.interval)
-					self._setHopIncrement(packet.hop)
+					if BTLE_CONNECT_REQ in packet:
+						aa = unpack(">I",pack("<I",packet.AA))[0]
+						self._setAccessAddress(aa)
+						self._setCrcInit(packet.crc_init)
+						self._setChannelMap(packet.chM)
+						self._setHopInterval(packet.interval)
+						self._setHopIncrement(packet.hop)
 
-					self.synchronized = True
+						self.synchronized = True
 
-				if BTLE_DATA in packet:
-					if packet.access_addr == 0x8e89bed6:
-						packet.access_addr= self.getAccessAddress()
+					if BTLE_DATA in packet:
+						if packet.access_addr == 0x8e89bed6:
+							packet.access_addr= self.getAccessAddress()
 
 
-				if BTLE_CTRL in packet and packet.opcode == 0x02: # TERMINATE_IND
-					self._setAccessAddress(0x8e89bed6)
-					self.synchronized = False
+					if BTLE_CTRL in packet and packet.opcode == 0x02: # TERMINATE_IND
+						self._setAccessAddress(0x8e89bed6)
+						self.synchronized = False
 
-			data = BTLE_RF(rf_channel = packet.btle_channel) / packet[BTLE:]
-			self.putPacket(bytes(data),timestamp)
+				#data = BTLE_RF(rf_channel = packet.btle_channel) / packet[BTLE:]
+				#self.putPacket(bytes(data),timestamp)
+				wrpcap(self.filename, packet[BTLE], append=True)
+		except:
+			import traceback
+			traceback.print_exc()

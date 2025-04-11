@@ -139,7 +139,7 @@ class SDRDevice(Device):
 
 	Every device based on a Software Defined Radio must inherit from this class and implements the following methods:
 	  * ``buildReceivePipeline(interface)`` : this method allows to build the receive pipeline
-	  * ``buildTransmitPieline(interface)`` : this method allows to build the transmit pipeline
+	  * ``buildTransmitPipeline(interface)`` : this method allows to build the transmit pipeline
 	  * ``setExperimentalDemodulator(enable)`` (optional) : this optional method allow to modify the receive pipeline to use an experimental demodulator (if any)
 
 	Keep in mind that the child class must also implements the methods of a classic ``Device``.
@@ -162,8 +162,10 @@ class SDRDevice(Device):
 		self.subscribers = []
 		self.sdrConfig = sdrConfig
 		self.sdrMode = sdrMode
-		self.receivePipeline = self.buildReceivePipeline(interface)
-		self.transmitPipeline = self.buildTransmitPipeline(interface)
+		if sdrMode in ["RX","HALF_DUPLEX","FULL_DUPLEX"]:
+			self.receivePipeline = self.buildReceivePipeline(interface)
+		if sdrMode in ["TX","HALF_DUPLEX","FULL_DUPLEX"]:
+			self.transmitPipeline = self.buildTransmitPipeline(interface)
 
 	def close(self):
 		if self.transmitPipeline is not None:

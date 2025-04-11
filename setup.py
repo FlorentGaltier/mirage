@@ -30,7 +30,7 @@ setup(
         "License :: OSI Approved :: MIT License",
         "Natural Language :: French",
         "Operating System :: Linux",
-        "Programming Language :: Python :: 3.6",
+        "Programming Language :: Python",
         "Topic :: Security",
     ],
 

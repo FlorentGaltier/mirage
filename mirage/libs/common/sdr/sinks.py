@@ -72,6 +72,215 @@ class SDRSink:
 		modulator.setSink(self)
 		return SDRPipeline(sink=self,modulator=modulator)
 
+
+
+class SoapySDRSink(SoapySDRHardware,SDRSink):
+	'''
+	This class defines a Sink for SoapySDR-compatible Software Defined Radio. It inherits from ``SDRSink``.
+	'''
+	numberOfSinks = 0
+
+	def __del__(self):
+		self.close()
+		SoapySDRSink.numberOfSinks-=1
+		if SoapySDRSink.numberOfSinks == 0 and SoapySDRSink.initialized:
+			SoapySDRHardware.closeAPI()
+
+	def __init__(self,interface):
+		SoapySDRHardware.__init__(self,interface=interface)
+		SDRSink.__init__(self,interface=interface)
+		self.lock = threading.Lock()
+		self.stream = None
+		self.loop_running=False
+		self.loop_continue=False
+		self.thread=None
+		self.alreadyStarted = False
+		self.currentData = []
+		if self.ready:
+			SoapySDRSink.numberOfSinks+=1
+
+
+	def setTXGain(self,gain):
+		'''
+		This method allows to set the TX gain used by the SoapySDR sink.
+
+		:param gain: TX gain to use
+		:type gain: int
+
+		:Example:
+
+			>>> hackrfSink.setGain(40)
+
+		'''
+		SoapySDRHardware.setTXGain(self, gain)
+		self.txGain=gain
+		#self.setTXGain(gain)
+
+	def setFrequency(self, frequency):
+		SoapySDRHardware.setFrequency(self, frequency)
+		self.frequency=frequency
+
+	def setSampleRate(self, sampleRate):
+		SoapySDRHardware.setSampleRate(self, sampleRate)
+		self.sampleRate=sampleRate
+
+	def setBandwidth(self, bandwidth):
+		SoapySDRHardware.setBandwidth(self, bandwidth)
+		self.bandwidth=bandwidth
+
+	def getGain(self):
+		'''
+		This method returns the TX gain used by the SoapySDR sink.
+
+		:return: TX gain in use
+		:rtype: int
+
+		:Example:
+
+			>>> hackrfSink.getGain()
+			40
+
+		'''
+		return self.txGain
+
+	def _runTransmission(self):
+		self.loop_running=True
+		self.loop_continue=True
+		self.alreadyStarted=True
+		try:
+			while self.loop_continue:
+				#print("Au")
+				if len(self.currentData[:self.blockLength])>=self.blockLength:
+					#print("Secours")
+					tmp_buf=np.array(self.currentData[:self.blockLength], dtype=np.complex64)
+					self.device.writeStream(self.stream, [tmp_buf], self.blockLength, timeoutUs=1000000)
+					self.currentData=self.currentData[self.blockLength:]
+		finally:
+			self.loop_running=False
+			self.alreadyStarted=False
+
+	def startStreaming(self):
+		'''
+		This method starts the streaming process.
+
+		:return: boolean indicating if the operation was successful
+		:rtype: bool
+
+		:Example:
+
+			>>> hackrfSink.startStreaming()
+			True
+
+		'''
+		if self.checkParameters() and not self.running:
+			if self.alreadyStarted:
+				self.restart()
+			self.lock.acquire()
+			self.stream=self.device.setupStream(SOAPY_SDR_TX, SOAPY_SDR_CF32, [0])
+			self.blockLength = self.device.getStreamMTU(self.stream)
+			self.device.setAntenna(SOAPY_SDR_TX, 0, self.device.listAntennas(SOAPY_SDR_TX, 0)[-1])
+			self.device.activateStream(self.stream)
+			self.lock.release()
+			self.thread=threading.Thread(target=self._runTransmission)
+			self.thread.start()
+			self.running=True
+			return True
+		return False
+
+
+	def stopStreaming(self):
+		'''
+		This method stops the streaming process.
+
+		:return: boolean indicating if the operation was successful
+		:rtype: bool
+
+		:Example:
+
+			>>> hackrfSink.stopStreaming()
+			True
+
+		'''
+		'''
+		This method returns a boolean indicating if the streaming process is enabled.
+
+		:return: boolean indicating if streaming is enabled
+		:rtype: bool
+
+		:Example:
+
+			>>> hackrfSink.isStreaming()
+			False
+
+		'''
+		if self.running:
+			self.loop_continue = False
+			self.thread.join(timeout=1)
+			if self.stream!=None:
+				self.lock.acquire()
+				self.device.deactivateStream(self.stream)
+				ret = self.device.closeStream(self.stream)
+				self.stream=None
+				self.lock.release()
+				self.running=False
+				if ret == 0:
+					self.alreadyStarted=False
+					self.running=False
+					return True
+				else:
+					return False
+			else:
+				return True
+		return False
+
+	def close(self):
+		'''
+		This method closes the HackRF Sink.
+
+		:return: boolean indicating if the operation was successful
+		:rtype: bool
+
+		:Example:
+
+				>>> hackrfSink.close()
+
+		'''
+		if self.ready and self.device is not None:
+			self.stopStreaming()
+		return False
+
+
+	def checkParameters(self):
+		'''
+		This method returns a boolean indicating if a mandatory parameter is missing.
+
+		:return: boolean indicating if the sink is correctly configured
+		:rtype: bool
+
+		:Example:
+
+				>>> hackrfSink.checkParameters()
+				[FAIL] You have to provide a frequency !
+				False
+
+		'''
+		valid = True
+		if self.frequency is None:
+			io.fail("You have to provide a frequency !")
+			valid = False
+		if self.bandwidth is None:
+			io.fail("You have to provide a bandwidth !")
+			valid = False
+		if self.txGain is None:
+			io.fail("You have to provide a TX Gain !")
+			valid = False
+		if self.sampleRate is None:
+			io.fail("You have to provide a sample rate !")
+			valid = False
+		return valid
+
+
+
 class HackRFSink(HackRFSDR,SDRSink):
 	'''
 	This class defines a Sink for HackRF Software Defined Radio. It inherits from ``SDRSink``.

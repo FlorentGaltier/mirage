@@ -4,7 +4,8 @@ import mirage.libs.io as mio
 from mirage.libs.wifi_utils.packets import *
 from mirage.libs.wifi_utils.constants import *
 from threading import Lock
-from scapy.all import *
+#from scapy.all import *
+from scapy.layers.dot11 import *
 import os,socket,fcntl,array,struct
 class WifiDevice(wireless.Device):
 	'''

@@ -5,6 +5,10 @@ from mirage.libs.common.sdr.hardware import *
 from mirage.libs import io,utils
 import os,threading,numpy
 
+import numpy as np
+import pickle
+
+ITER_NOISE=10
 
 '''
 This component implements the supported Software Defined Radio Sources (e.g. RX).
@@ -62,6 +66,186 @@ class SDRSource:
 	def __rshift__(self, demodulator):
 		demodulator.setSource(self)
 		return SDRPipeline(source=self,demodulator=demodulator)
+
+#class SoapySDRSource(SoapySDRHardware,SDRSource):
+class SoapySDRSource(SDRSource,SoapySDRHardware):
+	numberOfSources = 0
+
+	def __del__(self):
+		self.close()
+		SoapySDRSource.numberOfSources-=1
+		if SoapySDRSource.numberOfSources == 0:
+			SoapySDRHardware.closeAPI()
+
+	def __init__(self,interface):
+		self.alreadyStarted = False
+		self.loop_running=False
+		self.loop_continue=False
+		self.thread=None
+		self.stream=None
+		SDRSource.__init__(self,interface=interface)
+		SoapySDRHardware.__init__(self,interface=interface)
+		self.noise_amp=None
+
+		if self.ready:
+			SoapySDRSource.numberOfSources+=1
+
+	def _runReception(self):
+		import pickle
+		self.loop_running=True
+		self.loop_continue=True
+		self.alreadyStarted=True
+		iteration_num=0
+		line=[]
+		median_amplitudes=[]
+		try:
+			while self.loop_continue:
+				#print("AH")
+				tmp_buf=np.zeros(self.blockLength, dtype=np.complex64)
+				self.lock.acquire()
+				self.device.readStream(self.stream,[tmp_buf],self.blockLength,timeoutUs=1000000)
+				if iteration_num<ITER_NOISE or np.max(np.abs(tmp_buf))>self.noise_amp*1.25:
+					self.iqStream+=list(tmp_buf)
+				self.lock.release()
+				if iteration_num<ITER_NOISE or np.max(np.abs(tmp_buf))>self.noise_amp*1.25:
+					line+=list(tmp_buf)
+				#print("BH")
+				iteration_num+=1
+				#print(iteration_num)
+				if iteration_num<ITER_NOISE:
+					median_amplitudes.append(np.median(np.abs(tmp_buf)))
+				elif iteration_num==ITER_NOISE:
+					self.noise_amp=np.median(median_amplitudes)
+					print("VOICI LE BRUIT :",self.noise_amp)
+
+				#utils.wait(seconds=0.001)
+				#print("CH")
+		finally:
+			with open("debug_recv.complex","wb") as f:
+				f.write(pickle.dumps(line))
+			self.loop_running=False
+			self.alreadyStarted=False
+
+	def startStreaming(self):
+		'''
+		This method starts the streaming process.
+
+		:return: boolean indicating if the operation was successful
+		:rtype: bool
+
+		:Example:
+
+			>>> sdr.startStreaming()
+			True
+
+		'''
+		if self.checkParameters() and not self.running:
+			self.iqStream = []
+			#if self.alreadyStarted:
+			#	self.restart()
+			self.lock.acquire()
+			self.stream = self.device.setupStream(SOAPY_SDR_RX, SOAPY_SDR_CF32, [0])
+			self.blockLength = self.device.getStreamMTU(self.stream)
+			#self.device.setAntenna(SOAPY_SDR_RX, 0, "RX2")
+			self.device.setAntenna(SOAPY_SDR_RX, 0, self.device.listAntennas(SOAPY_SDR_RX, 0)[-1])
+			self.device.setGain(SOAPY_SDR_RX, 0, 55)
+			self.device.activateStream(self.stream)
+
+			self.lock.release()
+			self.thread=threading.Thread(target=self._runReception)
+			self.thread.start()
+			#if ret == ???:
+			#	self.running = True
+			#	return True
+			self.running=True
+			return True
+		return False
+
+	def stopStreaming(self):
+		'''
+		This method stops the streaming process.
+
+		:return: boolean indicating if the operation was successful
+		:rtype: bool
+
+		:Example:
+
+			>>> sdr.stopStreaming()
+			True
+
+		'''
+		#import inspect
+		#print([inspect.stack()[i][3] for i in range(len(inspect.stack()))])
+
+		if self.running:
+			self.loop_continue = False
+			self.thread.join(timeout=1)
+			#print("DEBUG",self.stream)
+			if self.stream!=None:
+				self.lock.acquire()
+				if self.stream!=None:
+					self.device.deactivateStream(self.stream)
+					ret = self.device.closeStream(self.stream)
+					self.stream=None
+				self.lock.release()
+				self.running=False
+				if ret == 0:
+					self.alreadyStarted = False
+					self.running = False
+					return True
+				else:
+					return False
+			else:
+				return True
+		return False
+
+	def checkParameters(self):
+		'''
+		This method returns a boolean indicating if a mandatory parameter is missing.
+
+		:return: boolean indicating if the source is correctly configured
+		:rtype: bool
+
+		:Example:
+
+				>>> soapySource.checkParameters()
+				[FAIL] You have to provide a frequency !
+				False
+
+		'''
+
+		valid = True
+		if self.frequency is None:
+			io.fail("You have to provide a frequency !")
+			valid = False
+		if self.bandwidth is None:
+			io.fail("You have to provide a bandwidth !")
+			valid = False
+		if self.gain is None:
+			io.fail("You have to provide a Gain !")
+			valid = False
+		if self.sampleRate is None:
+			io.fail("You have to provide a sample rate !")
+			valid = False
+		return valid
+
+	def setBandwidth(self,bandwidth):
+		SoapySDRHardware.setBandwidth(self,bandwidth)
+		self.bandwidth = bandwidth
+
+	def setFrequency(self,frequency):
+		SoapySDRHardware.setFrequency(self,frequency)
+		self.frequency = frequency
+
+	def setGain(self,gain):
+		SoapySDRHardware.setGain(self,gain)
+		self.gain = gain
+
+	def setSampleRate(self,sampleRate):
+		SoapySDRHardware.setSampleRate(self,sampleRate)
+		self.sampleRate = sampleRate
+
+
 
 class HackRFSource(HackRFSDR,SDRSource):
 	'''

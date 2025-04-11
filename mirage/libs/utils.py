@@ -1,4 +1,4 @@
-import psutil,time,os,sys,string,random,imp
+import psutil,time,os,sys,string,random,importlib.machinery,importlib.util
 from os.path import expanduser,exists
 
 def generateModulesDictionary(moduleDir, moduleUserDir):
@@ -17,11 +17,19 @@ def generateModulesDictionary(moduleDir, moduleUserDir):
 
 	for module in os.listdir(moduleDir):
 		if os.path.isfile(moduleDir+"/"+module) and module[-3:] == ".py" and module != "__init__.py":
-			modules[module[:-3]] = imp.load_source(module[:-3],moduleDir + "/"+module)
+			loader=importlib.machinery.SourceFileLoader(module[:-3], moduleDir+"/"+module)
+			spec=importlib.util.spec_from_loader(loader.name, loader)
+			modules[module[:-3]]=importlib.util.module_from_spec(spec)
+			spec.loader.exec_module(modules[module[:-3]])
+			#modules[module[:-3]] = imp.load_source(module[:-3],moduleDir + "/"+module)
 		
 	for module in os.listdir(moduleUserDir):
 		if os.path.isfile(moduleUserDir+"/"+module) and module[-3:] == ".py" and module != "__init__.py":
-			modules[module[:-3]] = imp.load_source(module[:-3],moduleUserDir + "/"+module)
+			loader=importlib.machinery.SourceFileLoader(module[:-3], moduleUserDir+"/"+module)
+			spec=importlib.util.spec_from_loader(loader.name, loader)
+			modules[module[:-3]]=importlib.util.module_from_spec(spec)
+			spec.loader.exec_module(modules[module[:-3]])
+			#modules[module[:-3]] = imp.load_source(module[:-3],moduleUserDir + "/"+module)
 
 	return modules
 
@@ -41,11 +49,19 @@ def generateScenariosDictionary(scenariosDir, scenariosUserDir):
 	scenarios = {}
 	for scenario in os.listdir(scenariosDir):
 		if os.path.isfile(scenariosDir+"/"+scenario) and scenario[-3:] == ".py" and scenario != "__init__.py":
-			scenarios[scenario[:-3]]=imp.load_source(scenario[:-3],scenariosDir + "/"+scenario)
+			loader=importlib.machinery.SourceFileLoader(scenario[:-3], scenariosDir+"/"+scenario)
+			spec=importlib.util.spec_from_loader(loader.name, loader)
+			scenarios[scenario[:-3]]=importlib.util.module_from_spec(spec)
+			spec.loader.exec_module(scenarios[scenario[:-3]])
+			#scenarios[scenario[:-3]]=imp.load_source(scenario[:-3],scenariosDir + "/"+scenario)
 		
 	for scenario in os.listdir(scenariosUserDir):
 		if os.path.isfile(scenariosUserDir+"/"+scenario) and scenario[-3:] == ".py" and scenario != "__init__.py":
-			scenarios[scenario[:-3]]=imp.load_source(scenario[:-3],scenariosUserDir + "/"+scenario)
+			loader=importlib.machinery.SourceFileLoader(scenario[:-3], scenariosUserDir+"/"+scenario)
+			spec=importlib.util.spec_from_loader(loader.name, loader)
+			scenarios[scenario[:-3]]=importlib.util.module_from_spec(spec)
+			spec.loader.exec_module(scenarios[scenario[:-3]])
+			#scenarios[scenario[:-3]]=imp.load_source(scenario[:-3],scenariosUserDir + "/"+scenario)
 
 	return scenarios
 

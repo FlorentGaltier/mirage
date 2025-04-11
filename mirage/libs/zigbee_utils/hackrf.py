@@ -1,4 +1,6 @@
-from scapy.all import *
+#from scapy.all import *
+from scapy.layers.dot15d4 import *
+from scapy.layers.zigbee import *
 from mirage.libs import wireless,io,utils
 from mirage.libs.zigbee_utils.constants import *
 from mirage.libs.common.sdr import sources,demodulators,decoders,sinks,modulators

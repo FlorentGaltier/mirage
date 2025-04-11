@@ -1,6 +1,11 @@
 import time,threading
 from queue import Queue
+#from collections import deque # WARNING : some operations may not be thread-safe! Chosen for efficiency given the use made here
+## --> append/pop from both sides is thread-safe
 from mirage.libs.utils import exitMirage
+
+import traceback
+import os
 
 class StoppableThread(threading.Thread):
 	'''
@@ -17,6 +22,12 @@ class StoppableThread(threading.Thread):
 		try:
 			while self.signal:
 				self._target(*(self._args))
+		except OSError as e:
+			#print("OS Error - killing Mirage")
+			print("OS Error")
+			traceback.print_exc()
+			print(e)
+			#os._exit(1)
 		except:
 			pass
 	def stop(self):
@@ -40,6 +51,8 @@ class PacketQueue:
 		self.waitEmpty = waitEmpty
 		self.autoStart = autoStart
 		self.queue = Queue()
+		#self.queue = deque()
+		#self.queue_size = 0
 		self.isStarted = False
 		if self.isDeviceUp():
 			self.device.subscribe(self)
@@ -78,7 +91,9 @@ class PacketQueue:
 		if hasattr(self,"isStarted") and self.isStarted:
 			if self.waitEmpty:
 				while not self.isEmpty():
-					time.sleep(0.05) # necessary ?
+					#time.sleep(0.05) # necessary ? # maybe not.
+					time.sleep(0.000001)
+					#pass
 			self.daemonThread.stop()
 			self.daemonThread = None
 			self.isStarted = False
@@ -107,8 +122,15 @@ class PacketQueue:
 		:rtype: bool
 		'''
 		return self.queue.empty()
+	#	try:
+	#		self.queue.append(self.queue.pop())
+	#		return False
+	#	except:
+	#		return True
+		#return self.queue_size==0
 
 	def clear(self):
+		#self.queue.clear()
 		while not self.isEmpty():
 			self.queue.get(False)
 
@@ -120,4 +142,5 @@ class PacketQueue:
 			(name in self.device.__class__.sharedMethods or name == "hasCapabilities")):
 			return getattr(self.device,name)
 		else:
+			print(f"DEBUG {name=} (!='device'?) - {hasattr(self.device,name)=} - {self.device.__class__.sharedMethods=} (contains {name=}?) OR {name=} (=='hascapabilities'?)")
 			raise AttributeError

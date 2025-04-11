@@ -42,7 +42,9 @@ class Callback:
 		This method allows to update the callback's internal state by providing the current packet.
 		If the packet received matchs the event defined, the attribute ``runnable`` is set to True.
 		'''
+		print("hum.")
 		self.runnable = False
+		pt=type(packet)
 		if packet is not None:
 			if self.eventType == "npackets":
 				self.count -= 1
@@ -52,6 +54,7 @@ class Callback:
 			elif self.eventType == "instanceof":
 				m = importlib.import_module(packet.__module__)
 				if isinstance(packet, getattr(m, self.instance)):
+				#if pt==getattr(m, self.instance):
 					self.runnable = True
 
 

@@ -10,10 +10,11 @@ class Loader:
 		'''
 		import mirage.modules as modules
 		self.modulesList = {}
-		for moduleName,module in modules.__modules__.items():
-			current = module#__import__("modules."+module, fromlist=module)
-			moduleClass = getattr(current,moduleName)
-			self.modulesList[moduleName] = moduleClass
+		#for moduleName,module in modules.__modules__.items():
+		for moduleName in modules.moduleNames:
+			#current = module#__import__("modules."+module, fromlist=module)
+			#moduleClass = getattr(current,moduleName)
+			self.modulesList[moduleName] = None#moduleClass
 
 	def getModulesNames(self):
 		'''
@@ -34,6 +35,10 @@ class Loader:
 		:rtype: core.module.Module
 		'''
 		if moduleName in self.modulesList:
+			if self.modulesList[moduleName] is None:
+				tmp_import=__import__("mirage.modules",fromlist=[moduleName])
+				tmp_module=getattr(tmp_import,moduleName)
+				self.modulesList[moduleName]=getattr(tmp_module,moduleName)
 			return self.modulesList[moduleName]()
 		else:
 			return None
@@ -49,6 +54,11 @@ class Loader:
 		displayDict = {}
 
 		for module in self.modulesList:
+			if self.modulesList[module] is None:
+				#tmp_import=__import__("mirage.modules."+module,fromlist=[module])
+				tmp_import=__import__("mirage.modules",fromlist=[module])
+				tmp_module=getattr(tmp_import,module)
+				self.modulesList[module]=getattr(tmp_module,module)
 			info = self.modulesList[module]().info()
 			technology = (info["technology"][:1]).upper() + (info["technology"][1:]).lower()
 			if (

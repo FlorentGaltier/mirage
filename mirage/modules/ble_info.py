@@ -122,7 +122,7 @@ class ble_info(module.WirelessModule):
 			versionMajor,versionMinor = self.emitter.getFirmwareVersion()
 			version = str(versionMajor)+"."+str(versionMinor)
 			index = self.emitter.getDeviceIndex()
-			customFirmware = "yes" if version == "3.14" else "no"
+			customFirmware = "yes" if (version == "3.14" or version=="4.2") else "no"
 			io.chart(["Interface","Device Index","Version","Custom Firmware"],[[interface,("#"+str(index) if isinstance(index,int) else str(index)),version,customFirmware]])
 			return self.ok({
 					"INTERFACE":interface,

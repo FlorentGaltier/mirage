@@ -1,4 +1,4 @@
-from scapy.all import *
+from scapy.layers.bluetooth import *;from scapy.layers.bluetooth4LE import *
 import subprocess,struct
 from mirage.libs import io,utils,wireless
 

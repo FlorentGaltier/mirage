@@ -1,1 +1,7 @@
 *.pyc
+*.complex
+*.bak*
+*.pcap
+*__pycache__*
+*.gattfile
+*.attfile

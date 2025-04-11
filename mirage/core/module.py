@@ -8,6 +8,8 @@ The modules defined in the framework inherits from these classes in order to
 provide a standard API.
 '''
 
+has_keyboard_warned=False
+
 class Module:
 	'''
 	This class defines the standard behaviour of a Mirage Module.
@@ -114,6 +116,7 @@ class Module:
 			self.postrun()
 			raise KeyboardInterrupt
 		except EOFError:
+			traceback.print_exc()
 			self.postrun()
 			raise EOFError
 	def info(self):
@@ -148,7 +151,12 @@ class Module:
 		This method allows to register a callback called if a key is pressed (if a scenario is provided).
 		It allows to provide a simple user interaction in scenarios.
 		'''
-		keyboard.on_release(self._keyEvent)
+		try:
+			keyboard.on_release(self._keyEvent)
+		except ImportError as e:
+			if not has_keyboard_warned:
+				has_keyboard_warned=True
+				io.warning("You must be root to enable suggestions")
 
 	@scenarioSignal("onKey")
 	def key(self,key):
@@ -247,8 +255,12 @@ class WirelessModule(Module):
 		interface = interface if interface != "" else self.args['INTERFACE']
 		if interface not in self.__class__.Emitters:
 			try:
+				#print(self.__class__, "><", self.__class__.Emitters, "><", self.__class__.EmittersClass[self.technology])
 				self.__class__.Emitters[interface] = self.__class__.EmittersClass[self.technology](interface=interface)
 			except AttributeError:
+				#FIXME
+				import traceback
+				traceback.print_exc()
 				io.fail("Device not found !")
 				utils.exitMirage()
 		self.__class__.Emitters[interface].updateSDRConfig(self.sdrConfig)
@@ -266,8 +278,12 @@ class WirelessModule(Module):
 		interface = interface if interface != "" else self.args['INTERFACE']
 		if interface not in self.__class__.Receivers:
 			try:
+				#print(self.__class__, "><", self.__class__.Receivers, "><", self.__class__.ReceiversClass[self.technology])
 				self.__class__.Receivers[interface] = self.__class__.ReceiversClass[self.technology](interface=interface)
 			except AttributeError:
+				#FIXME
+				import traceback
+				traceback.print_exc()
 				io.fail("Device not found !")
 				utils.exitMirage()
 		self.__class__.Receivers[interface].updateSDRConfig(self.sdrConfig)

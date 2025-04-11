@@ -1,10 +1,26 @@
 from fcntl import ioctl
 import socket
 
+import struct
+
 class HCIConfig(object):
 	'''
 	This class allows to easily configure an HCI Interface.
 	'''
+	@classmethod
+	def list(cls):
+		sock = socket.socket(31, socket.SOCK_RAW, 1)
+		try:
+			arg=struct.pack('I', 16) + b"\x00"*(8*16)
+			output=ioctl(sock.fileno(), 0x800448d2, arg) # GETDEVLIST
+			number_of_devices = struct.unpack('H', output[:2])[0]
+		except Exception:
+			number_of_devices=0
+		device_ids=[]
+		for device_number in range(number_of_devices):
+			device_id=struct.unpack('H', output[4+8*device_number:4+8*device_number+2])[0]
+			device_ids.insert(0,device_id)
+		return device_ids
 
 	@staticmethod
 	def down(index):

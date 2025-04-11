@@ -1,13 +1,46 @@
 from mirage.libs.wireless_utils.scapy_butterfly_layers import *
 from mirage.libs import io,utils,wireless
-from threading import Lock
+from threading import Lock, Thread
 from queue import Queue
 import usb
+import traceback
 
 # ButterRFly USB device Identifiers
 BUTTERFLY_ID_VENDOR = 0x5A17
 BUTTERFLY_ID_PRODUCT = 0x0000
 
+def timeouted(timeout, default_return):
+	def decorator_timeout(function):
+		def aux_retval(function, *args, **kwargs):
+			try:
+				retvals=args[0]
+				retvals.append(function(*args[1:],**kwargs))
+			except usb.core.USBError:
+				traceback.print_exc()
+				return
+
+		@functools.wraps(function)
+		def aux(*args, **kwargs):
+			retvals=[]
+			try:
+				t=StoppableThread(target = aux_retval, args = tuple([function, retvals]+list(args)), kwargs = kwargs)
+				t.start()
+				t.join(timeout/1000.)
+				if t.is_alive():
+					t.stop()
+			except usb.core.USBError:
+				traceback.print_exc()
+				pass
+			if retvals==[]:
+				return default_return
+			return retvals[-1]
+		return aux
+	return decorator_timeout
+
+
+@timeouted(10, 0)
+def timeouted_read(dongle, endpoint, size_or_buffer, timeout=None):
+	return dongle.read(endpoint, size_or_buffer, timeout=timeout)
 
 class ButterflyDevice(wireless.Device):
 	'''
@@ -27,7 +60,8 @@ class ButterflyDevice(wireless.Device):
 		self.dongle.write(0x01, data)
 		try:
 			response = self.dongle.read(0x81,64)
-		except usb.core.USBTimeoutError:
+		except usb.core.USBError:
+			traceback.print_exc()
 			response = b""
 		self.lock.release()
 		if len(response) >= 5 and raw(command)[3:5] == bytes(response)[3:5]:
@@ -36,16 +70,29 @@ class ButterflyDevice(wireless.Device):
 		return None
 
 	def _recv(self):
-		self.lock.acquire()
-		size = 0
-		data = array('B',[0]*64)
-		try:
-			size = self.dongle.read(0x81,data,timeout=10)
-		except usb.core.USBTimeoutError:
-			pass
-		self.lock.release()
-		if size > 0:
-			return Butterfly_Message_Hdr(bytes(data)[:size])
+		#self.lock.acquire()
+		retval=self.lock.acquire()
+		if retval:
+			#size = 0
+			#data = array('B',[0]*64)
+			size = 64
+			data = None
+			try:
+				#size = self.dongle.read(0x81,data,timeout=10)
+				#data = self.dongle.read(0x81,size,timeout=10)
+				data = self.dongle.read(0x81,size,timeout=1)
+				size = len(data)
+			except usb.core.USBTimeoutError:
+				#traceback.print_exc()
+				#print("T",end="")
+				pass
+			self.lock.release()
+			#if size > 0:
+			if data is not None:
+				res = Butterfly_Message_Hdr(bytes(data)[:size])
+				#print("DEBUG",res)
+				#res.show()
+				return res
 		return None
 
 	def recv(self):
@@ -169,6 +216,7 @@ class ButterflyDevice(wireless.Device):
 		self.ready = False
 		try:
 			self.dongle = list(usb.core.find(idVendor=BUTTERFLY_ID_VENDOR, idProduct=BUTTERFLY_ID_PRODUCT,find_all=True))[self.index]
+			self.dongle.reset()
 			self.dongle.set_configuration()
 			self.isListening = False
 			self.controller = "NONE"
@@ -177,6 +225,7 @@ class ButterflyDevice(wireless.Device):
 			self.responsesQueue = Queue()
 
 		except:
+			traceback.print_exc()
 			io.fail("No ButteRFly device found !")
 			self.dongle = None
 

@@ -1,10 +1,6 @@
 import sys
 from enum import IntEnum
 from terminaltables import SingleTable
-import matplotlib
-matplotlib.use('Agg')
-import matplotlib.pyplot as plt
-import matplotlib.animation as animation
 
 '''
 This submodule provides some useful functions allowing to interact with the users.
@@ -42,7 +38,7 @@ def banner():
 ██╔████╔██║██║██████╔╝███████║██║  ███╗█████╗
 ██║╚██╔╝██║██║██╔══██╗██╔══██║██║   ██║██╔══╝
 ██║ ╚═╝ ██║██║██║  ██║██║  ██║╚██████╔╝███████╗
-╚═╝     ╚═╝╚═╝╚═╝  ╚═╝╚═╝  ╚═╝ ╚═════╝ ╚══════╝
+╚═╝	 ╚═╝╚═╝╚═╝  ╚═╝╚═╝  ╚═╝ ╚═════╝ ╚══════╝
 	''',"red"))
 
 
@@ -210,17 +206,17 @@ def chart(columnsName,content,title=""):
 	:Example:
 
 		>>> io.chart(["A","B","A xor B"],[
-		...                               ["False","False","False"],
-		...                               ["True","False","True"],
-		...                               ["False", "True", "True"],
-		...                               ["True", "True", "False"]
-		...                              ],title="XOR Table")
+		...							   ["False","False","False"],
+		...							   ["True","False","True"],
+		...							   ["False", "True", "True"],
+		...							   ["True", "True", "False"]
+		...							  ],title="XOR Table")
 		┌XOR Table──────┬─────────┐
-		│ A     │ B     │ A xor B │
+		│ A	 │ B	 │ A xor B │
 		├───────┼───────┼─────────┤
 		│ False │ False │ False   │
-		│ True  │ False │ True    │
-		│ False │ True  │ True    │
+		│ True  │ False │ True	│
+		│ False │ True  │ True	│
 		│ True  │ True  │ False   │
 		└───────┴───────┴─────────┘
 
@@ -311,6 +307,10 @@ class MiceVisualizer:
 
 	'''
 	def __init__(self,datas=[],outputFile = "mice.gif", lineColor="tab:blue",leftClickColor="tab:red",rightClickColor="tab:purple", showStart=False):
+		import matplotlib
+		matplotlib.use('Agg')
+		import matplotlib.pyplot as plt
+		import matplotlib.animation as animation
 		self.datas =  datas
 		self.outputFile = outputFile
 		self.lineColor = lineColor

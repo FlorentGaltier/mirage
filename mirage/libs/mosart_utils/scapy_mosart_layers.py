@@ -1,4 +1,4 @@
-from scapy.all import Packet, bind_layers
+from scapy.packet import Packet, bind_layers
 from scapy.fields import *
 '''
 This module contains some scapy definitions for Mosart protocol.

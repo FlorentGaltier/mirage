@@ -1,6 +1,12 @@
-import os, sys, imp
+import os, sys#, importlib
 from mirage.core.app import App
 from mirage.libs.utils import getHomeDir,generateScenariosDictionary
+
+#if App.Instance is not None:
+#	# Scenarios Directory
+#	SCENARIOS_DIR = os.path.abspath(os.path.dirname(__file__))
+#	SCENARIOS_USER_DIR = getHomeDir() + "/scenarios"
+#    scenarioNames=[x[:-3] for x in os.listdir(SCENARIOS_DIR) if x[-3:]==".py" and x[0]!="_"]
 
 if App.Instance is not None:
 	# Scenarios Directory

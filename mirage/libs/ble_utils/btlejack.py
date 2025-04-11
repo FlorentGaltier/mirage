@@ -7,6 +7,7 @@ from mirage.libs.ble_utils.constants import *
 from mirage.libs.ble_utils.scapy_btlejack_layers import *
 from mirage.libs import io,utils,wireless
 
+
 class BTLEJackDevice(wireless.Device):
 	'''
 	This device allows to communicate with a BTLEJack Device in order to sniff Bluetooth Low Energy protocol.
@@ -15,39 +16,39 @@ class BTLEJackDevice(wireless.Device):
 	The following capabilities are actually supported :
 
 	+-----------------------------------+----------------+
-	| Capability			    | Available ?    |
+	| Capability				| Available ?	|
 	+===================================+================+
-	| SCANNING                          | yes            |
+	| SCANNING						  | yes			|
 	+-----------------------------------+----------------+
-	| ADVERTISING                       | no             |
+	| ADVERTISING					   | no			 |
 	+-----------------------------------+----------------+
-	| SNIFFING_ADVERTISEMENTS           | yes            |
+	| SNIFFING_ADVERTISEMENTS		   | yes			|
 	+-----------------------------------+----------------+
-	| SNIFFING_NEW_CONNECTION           | yes            |
+	| SNIFFING_NEW_CONNECTION		   | yes			|
 	+-----------------------------------+----------------+
-	| SNIFFING_EXISTING_CONNECTION      | yes            |
+	| SNIFFING_EXISTING_CONNECTION	  | yes			|
 	+-----------------------------------+----------------+
-	| JAMMING_CONNECTIONS               | yes            |
+	| JAMMING_CONNECTIONS			   | yes			|
 	+-----------------------------------+----------------+
-	| JAMMING_ADVERTISEMENTS            | yes            |
+	| JAMMING_ADVERTISEMENTS			| yes			|
 	+-----------------------------------+----------------+
-	| HIJACKING_MASTER                  | yes            |
+	| HIJACKING_MASTER				  | yes			|
 	+-----------------------------------+----------------+
-	| HIJACKING_SLAVE                   | no             |
+	| HIJACKING_SLAVE				   | no			 |
 	+-----------------------------------+----------------+
-	| INJECTING                         | no             |
+	| INJECTING						 | no			 |
 	+-----------------------------------+----------------+
-	| MITMING_EXISTING_CONNECTION       | no             |
+	| MITMING_EXISTING_CONNECTION	   | no			 |
 	+-----------------------------------+----------------+
-	| INITIATING_CONNECTION             | no             |
+	| INITIATING_CONNECTION			 | no			 |
 	+-----------------------------------+----------------+
-	| RECEIVING_CONNECTION              | no             |
+	| RECEIVING_CONNECTION			  | no			 |
 	+-----------------------------------+----------------+
-	| COMMUNICATING_AS_MASTER           | yes            |
+	| COMMUNICATING_AS_MASTER		   | yes			|
 	+-----------------------------------+----------------+
-	| COMMUNICATING_AS_SLAVE            | no             |
+	| COMMUNICATING_AS_SLAVE			| no			 |
 	+-----------------------------------+----------------+
-	| HCI_MONITORING                    | no             |
+	| HCI_MONITORING					| no			 |
 	+-----------------------------------+----------------+
 
 	'''
@@ -79,6 +80,7 @@ class BTLEJackDevice(wireless.Device):
 			"getAccessAddress",
 			"getCrcInit",
 			"getChannelMap",
+			"setChannelMap", # debug btlejack hijacking
 			"getHopInterval",
 			"getHopIncrement",
 			"setJamming",
@@ -105,7 +107,7 @@ class BTLEJackDevice(wireless.Device):
 		self.jamming = enable
 
 
-	def setHijacking(self,enable=True):
+	def setHijacking(self,target="master",enable=True):
 		'''
 		This method allows to enable or disable the hijacking mode.
 
@@ -122,6 +124,7 @@ class BTLEJackDevice(wireless.Device):
 			This method is a **shared method** and can be called from the corresponding Emitters / Receivers.
 
 		'''
+		assert target=="master"
 		self.hijacking = enable
 
 
@@ -445,7 +448,7 @@ class BTLEJackDevice(wireless.Device):
 		command = None
 		if BTLE_DATA in packet:
 			command = BTLEJack_Hdr()/BTLEJack_Send_Packet_Command(ble_payload=packet[BTLE_DATA:])
-		if self.isConnected() and CtrlPDU in command.ble_payload and command.ble_payload.optcode == 0x02:
+		if self.isConnected() and BTLE_CTRL in command.ble_payload and command.ble_payload.optcode == 0x02:
 			self.hijacked = False
 		if command is not None :
 			self._send(raw(command))
@@ -487,7 +490,7 @@ class BTLEJackDevice(wireless.Device):
 													 channel is None else channel))
 
 	# Existing Connection Sniffing methods
-	def sniffExistingConnections(self,accessAddress=None,crcInit=None,channelMap=None):
+	def sniffExistingConnections(self,accessAddress=None,crcInit=None,channelMap=None,hopInterval=None,hopIncrement=None):
 		'''
 		This method starts the existing connections sniffing mode.
 
@@ -531,7 +534,20 @@ class BTLEJackDevice(wireless.Device):
 					self._recoverFromCrcInit(accessAddress,crcInit)
 				else:
 					self._setChannelMap(channelMap)
-					self._recoverFromChannelMap(accessAddress,crcInit, channelMap)
+					if hopInterval is None or hopIncrement is None:
+						self._recoverFromChannelMap(accessAddress,crcInit, channelMap)
+					else:
+						self._setHopInterval(hopInterval)
+						self._setHopIncrement(hopIncrement)
+						if self.hijacking:
+							#print("DEBUG : Sending BTLEJack hijacking command")
+							p=BTLEJack_Enable_Hijacking_Command(enabled=0x01)
+							#p.show()
+							self._internalCommand(p)
+							#print("DEBUG : BTLEJack hijacking command sent")
+						elif self.jamming:
+							self._internalCommand(BTLEJack_Enable_Jamming_Command(enabled=0x01))
+						self.synchronized = True
 
 	def _resetFilteringPolicy(self,policyType="blacklist"):
 		policy = 0x00 if policyType == "blacklist" else 0x01
@@ -622,8 +638,8 @@ class BTLEJackDevice(wireless.Device):
 				self.setChannel(channel)
 			self._internalCommand(BTLEJack_Advertisements_Command()/BTLEJack_Advertisements_Enable_Jamming_Command(
 											offset=offset,
-										    	pattern=pattern,
-										    	channel=self.getChannel() if
+												pattern=pattern,
+												channel=self.getChannel() if
 										 	channel is None else channel))
 		else:
 			io.fail("Jamming advertisements is not supported by BTLEJack firmware,"
@@ -640,6 +656,10 @@ class BTLEJackDevice(wireless.Device):
 		self.crcInit = crcInit
 
 	def _setChannelMap(self,channelMap=None):
+		self.channelMap = channelMap
+
+	#debug btlejack hijacking
+	def setChannelMap(self,channelMap=None):
 		self.channelMap = channelMap
 
 	def _setHopInterval(self,hopInterval=None):
@@ -931,16 +951,18 @@ class BTLEJackDevice(wireless.Device):
 		pkt = self._recv()
 		self._exitListening()
 		if pkt is not None:
+			#print("DEBUG BTLEJACK : Received a packet!")
+			#pkt.show()
 
 			if self.customMirageFirmware and BTLEJack_Advertisement_Packet_Notification in pkt:
 				timestamp = time.time()
 				ts_sec = int(timestamp)
 				ts_usec = int((timestamp - ts_sec)*1000000)
 
-				if pkt.crc_ok == 0x01:
-					io.success("CRC OK !")
-				else:
-					io.fail("CRC not OK !")
+				#if pkt.crc_ok == 0x01:
+				#	io.success("CRC OK !")
+				#else:
+				#	io.fail("CRC not OK !")
 
 				if pkt.crc_ok != 0x01 and self.crcEnabled:
 					return None
@@ -952,7 +974,8 @@ class BTLEJackDevice(wireless.Device):
 						rssi_max=-pkt.rssi,
 						rssi_min=-pkt.rssi,
 						rssi_avg=-pkt.rssi,
-						rssi_count=1)/BTLE()/BTLE_ADV(pkt.ble_payload)
+						rssi_count=1)/BTLE()/pkt.ble_payload
+						#rssi_count=1)/BTLE()/BTLE_ADV(pkt.ble_payload)
 			if BTLEJack_Access_Address_Notification in pkt:
 				self._addCandidateAccessAddress(accessAddress=pkt.access_address,
 								rssi=pkt.rssi,
@@ -979,6 +1002,8 @@ class BTLEJackDevice(wireless.Device):
 				self.synchronized = True
 
 			if BTLEJack_Hijack_Status_Notification in pkt:
+				if pkt.status != 0:
+					io.fail("Attack failed")
 				self.hijacked = (pkt.status == 0x00)
 
 			if BTLEJack_Nordic_Tap_Packet_Notification in pkt:
@@ -1164,7 +1189,7 @@ class BTLEJackDevice(wireless.Device):
 				(major,minor) = self._getFirmwareVersion()
 				io.success("BTLEJack device "+("#"+str(self.index) if isinstance(self.index,int) else str(self.index))+
 					   " successfully instantiated (firmware version : "+str(major)+"."+str(minor)+")")
-				if major == 3 and minor == 14:
+				if (major == 3 and minor == 14) or (major == 4 and minor == 2):
 					io.info("Custom Mirage Firmware used ! Advertisements sniffing and jamming will be supported.")
 					self.capabilities += ["SNIFFING_ADVERTISEMENTS","SCANNING","JAMMING_ADVERTISEMENTS"]
 					self.customMirageFirmware = True

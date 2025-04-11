@@ -1,11 +1,309 @@
 from ctypes import *
 from mirage.libs.common.sdr.hackrf_definitions import *
+from mirage.libs.common.sdr.soapy_definitions import *
 from mirage.libs import io,utils
 import os,threading
+import json
 
 '''
 This component implements the API used to interact with Software Defined Radios.
 '''
+
+class SoapySDRHardware:
+	'''
+	This class provides an API to inteact with SoapySDR-compatible Software Defined Radios
+	'''
+	initialized = False
+	instances = {}
+
+	@classmethod
+	def setupAPI(cls):
+		'''
+		This method initializes the SoapySDR API.
+		'''
+		if not SOAPY_AVAILABLE:
+			io.fail("Fatal error: SoapySDR has not been found. Exiting ...")
+			utils.exitMirage()
+
+		if not cls.initialized:
+			cls.initialized = True
+			io.success("SoapySDR API initialized !")
+
+	@classmethod
+	def closeAPI(cls):
+		'''
+		This method closes the SoapySDR API.
+		'''
+		if cls.initialized:
+			cls.initialized = False
+
+	def __init__(self, interface):
+		io.info(f"Searching for corresponding SoapySDR device... (interface={interface})")
+		self.device=None
+		self.soapy_kwargs={}
+		self.ready=False
+		devicesList=None
+		self.lock = threading.Lock()
+		if interface.startswith("soapy") and (interface[5:].isdigit() or interface[5:] == ""):
+			devicesList = SoapySDR.Device.enumerate()
+			self.index = 0 if interface[5:] == "" else int(interface[5:])
+			self.device = SoapySDR.Device(devicesList[self.index]) if self.index < len(devicesList) else None
+		elif interface.startswith("soapy:"):
+			self.soapy_kwargs = json.loads(interface.split(":")[1].replace("'",'"'))
+			devicesList = SoapySDR.Device.enumerate(self.soapy_kwargs)
+			self.device = SoapySDR.Device(devicesList[0]) if len(devicesList)>0 else None
+
+		if self.device is not None:
+			self.ready = True
+		else:
+			io.fail("Soapy device not found !")
+			utils.exitMirage()
+
+
+	def setBandwidth(self,bandwidth):
+		'''
+		This method sets the bandwidth.
+
+		:param bandwidth: bandwidth in Hertz
+		:type bandwidth: int
+		:return: boolean indicating if the operation was successful
+		:rtype: bool
+
+		:Example:
+
+			>>> sdr.setBandwidth(1 * 1000 * 1000)
+			True
+
+		'''
+		self.lock.acquire()
+		ret = self.device.setSampleRate(SOAPY_SDR_RX, 0, bandwidth)
+		if ret==0:
+			ret = self.device.setSampleRate(SOAPY_SDR_TX, 0, bandwidth)
+		if ret==0:
+			ret = self.device.setBandwidth(SOAPY_SDR_RX, 0, bandwidth)
+		if ret==0:
+			ret = self.device.setBandwidth(SOAPY_SDR_TX, 0, bandwidth)
+		self.lock.release()
+
+		if ret == 0:
+			self.bandwidth = bandwidth
+			return True
+		else:
+			return False
+
+	def getBandwidth(self):
+		'''
+		This method returns the bandwidth.
+
+		:return: bandwidth in Hertz
+		:rtype: int
+
+		:Example:
+
+			>>> sdr.getBandwidth()
+			1000000
+
+		'''
+
+		return self.bandwidth
+
+	def setFrequency(self,frequency):
+		'''
+		This method sets the frequency used.
+
+		:param frequency: frequency (in Hertz)
+		:type frequency: int
+		:return: boolean indicating if the operation was successful
+		:rtype: bool
+
+		:Example:
+
+			>>> sdr.setFrequency(2402000000)
+			True
+
+		'''
+		self.lock.acquire()
+		ret = self.device.setFrequency(SOAPY_SDR_RX, 0, float(frequency))
+		if ret==0:
+			ret = self.device.setFrequency(SOAPY_SDR_TX, 0, float(frequency))
+		self.lock.release()
+
+		if ret == 0:
+			self.frequency = frequency
+			return True
+		else:
+			return False
+
+	def getFrequency(self):
+		'''
+		This method returns the frequency used.
+
+		:return: current frequency (in Hertz)
+		:rtype: int
+
+		:Example:
+
+			>>> sdr.getFrequency()
+			2402000000
+
+		'''
+		return self.frequency
+
+	def setSampleRate(self,sampleRate):
+		'''
+		This method sets the sample rate.
+
+		:param sampleRate: sample rate (in samples/s)
+		:type sampleRate: int
+		:return: boolean indicating if the operation was successful
+		:rtype: bool
+
+		:Example:
+
+			>>> sdr.setSampleRate(2 * 1000 * 1000)
+			True
+
+		'''
+		print("debug : setSampleRate called")
+		self.lock.acquire()
+		ret = self.device.setSampleRate(SOAPY_SDR_RX, 0, sampleRate)
+		if ret==0:
+			ret = self.device.setSampleRate(SOAPY_SDR_TX, 0, sampleRate)
+		self.lock.release()
+
+		if ret == 0:
+			self.sampleRate = sampleRate
+			return True
+		else:
+			return False
+
+	def getSampleRate(self):
+		'''
+		This method returns the sample rate.
+
+		:return: sample rate in use(in samples/s)
+		:rtype: int
+
+		:Example:
+
+			>>> sdr.getSampleRate()
+			2000000
+
+		'''
+		return self.sampleRate
+
+	def setTXGain(self,txGain): # TX Gain
+		'''
+		This method sets the TX gain.
+
+		:param txGain: TX gain
+		:type txGain: int
+		:return: boolean indicating if the operation was successful
+		:rtype: bool
+
+		:Example:
+
+			>>> sdr.setTXGain(40)
+			True
+
+		'''
+		self.lock.acquire()
+		ret = self.device.setGain(SOAPY_SDR_TX, 0, txGain)
+		self.lock.release()
+
+		if ret == 0:
+			self.txGain = txGain
+			return True
+		else:
+			return False
+
+	def getTXGain(self):
+		'''
+		This method returns the TX gain.
+
+		:return: TX gain in use
+		:rtype: int
+
+		:Example:
+
+			>>> hackrf.getTXGain()
+			40
+
+		'''
+		return self.txGain
+
+	def setGain(self,gain): # VGA Gain
+		'''
+		This method sets the VGA gain.
+
+		:param gain: VGA gain
+		:type gain: int
+		:return: boolean indicating if the operation was successful
+		:rtype: bool
+
+		:Example:
+
+			>>> sdr.setGain(40)
+			True
+
+		'''
+		self.lock.acquire()
+		ret = self.device.setGain(SOAPY_SDR_RX, 0, gain)
+		self.lock.release()
+
+		if ret == 0:
+			self.gain = gain
+			return True
+		else:
+			return False
+
+
+	def getGain(self):
+		'''
+		This method returns the VGA gain.
+
+		:return: VGA gain in use
+		:rtype: int
+
+		:Example:
+
+			>>> sdr.getGain()
+			40
+
+		'''
+		return self.gain
+
+	def isReady(self):
+		'''
+		This method indicates if the current HackRF is ready to use.
+
+		:return: boolean indicating if the HackRF is ready
+		:rtype: bool
+
+		:Example:
+
+			>>> hackrf.isReady()
+			True
+
+		'''
+		return self.ready
+
+	def setLNAGain(self,lnaGain): # LNA Gain
+		return True
+
+	def enableAmplifier(self):
+		return True
+
+
+	def disableAmplifier(self):
+		return True
+
+	def enableAntenna(self):
+		return True
+
+	def disableAntenna(self):
+		return True
+
 
 class HackRFSDR:
 	'''

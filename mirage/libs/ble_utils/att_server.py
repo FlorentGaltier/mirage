@@ -616,6 +616,7 @@ class ATT_Server:
 				size_handle = 2
 				size_value = len(elmt["value"])
 				if ((last_size_value is None or last_size_value == size_value) and 
+				    #total_size + size_handle + size_value < self.mtu - 1):
 				    total_size + size_handle + size_value < self.mtu):
 					body.append(elmt)
 					total_size += size_handle + size_value

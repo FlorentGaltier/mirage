@@ -1,4 +1,7 @@
-from scapy.all import *
+
+from scapy.layers.bluetooth import *; from scapy.layers.bluetooth4LE import *
+from scapy.fields import *
+from scapy.packet import Packet
 
 '''
 This module contains some scapy definitions for communicating with a ButteRFly device.
