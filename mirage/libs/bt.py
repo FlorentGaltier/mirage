@@ -108,13 +108,9 @@ class BtHCIDevice(wireless.Device):
 		#	recv=self.socket.recv()
 		#	self.recvLock.release()
 		if not self.pendingQueue.empty():
-			#print("DEBUG _recv A 1")
 			recv = self.pendingQueue.get(block=True)
-			#print("DEBUG _recv A 2")
 		else:
-			#print("DEBUG _recv B 1")
 			self.recvLock.acquire()
-			#print("DEBUG _recv B 2")
 			try:
 				recv = self.socket.recv()
 			except Exception as e:
@@ -122,9 +118,7 @@ class BtHCIDevice(wireless.Device):
 				traceback.print_exc()
 				print(e)
 				recv=None
-			#print("DEBUG _recv B 3")
 			self.recvLock.release()
-			#print("DEBUG _recv B 4")
 		return recv
 
 
@@ -163,16 +157,13 @@ class BtHCIDevice(wireless.Device):
 
 	def _internalCommand(self,cmd,noResponse=False):
 		cmd = HCI_Hdr()/HCI_Command_Hdr()/cmd
-		#print(f"DEBUG internalCommand {cmd=}")
 		while not self._commandModeEnabled():
 			utils.wait(seconds=0.05)
 			#utils.wait(second=0.01)
 			#pass
-		#print("DEBUG commandModeEnabled")
 		self._flushCommandResponses()
 
 		self.send(cmd)
-		#print("DEBUG commandSent")
 		if not noResponse:
 			#print("Waiting for response...")
 			if SCAPY_VERSION>=VERSION_2_5_0 and SCAPY_VERSION<VERSION_2_6_0:
@@ -180,14 +171,10 @@ class BtHCIDevice(wireless.Device):
 			elif SCAPY_VERSION>=VERSION_2_6_0 and SCAPY_VERSION<VERSION_2_7_0:
 				cmd_opcode=(cmd.ogf<<10)+cmd.ocf
 			if self._isListening():
-				#print("DEBUG selecting getResp a")
 				getResponse = lambda:self.commandResponses.get() if not self.commandResponses.empty() else None
 			else:
-				#print("DEBUG selecting getResp b")
 				getResponse = self._recv
-			#print("DEBUG getResp 1")
 			response = getResponse()
-			#print(f"DEBUG getResp 2 {response=}")
 			while response is None or response.type != 0x04 or response.code != 0xe:
 				response = getResponse()
 			if response.type == 0x04 and response.code == 0xe and response.opcode == cmd_opcode:
@@ -541,7 +528,6 @@ class BtHCIDevice(wireless.Device):
 				success = False
 			elif manufacturer == 10: # Cambridge Silicon Radio
 				utils.wait(seconds=1)
-				#print("DEBUG CSR - modifying address")
 				existing_devices=HCIConfig.list()
 				self._internalCommand(HCI_Cmd_CSR_Write_BD_Address(addr=address),noResponse=True)
 				#utils.wait(seconds=1)
@@ -557,7 +543,6 @@ class BtHCIDevice(wireless.Device):
 				#	success=False
 				#	while not success:
 				#		devices = HCIConfig.list()
-				#		print(f"DEBUG {existing_devices=} {devices=} {self.adapter=} {type(devices[0])=} {type(self.__index)=}")
 				#		if self.adapter not in devices:
 				#			for i in existing_devices:
 				#				if i != self.adapter:
