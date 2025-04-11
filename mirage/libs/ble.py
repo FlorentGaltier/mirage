@@ -555,14 +555,14 @@ class BLEEmitter(wireless.Emitter):
 		pt=type(packet)
 
 		if packet.packet is None:
-			if isinstance(packet,BLEEncryptedPacket): # NOTE : was using isinstance
+			if isinstance(packet,BLEEncryptedPacket):
 					packet.packet = BTLE() / BTLE_DATA(packet.data)
 			else:
 				# Specific sublayers
 				#if "hci" in self.interface:
 				if dt==BLEHCIDevice:
 					packet.packet = HCI_Hdr()
-					if isinstance(packet,BLEConnect): # NOTE : was using isinstance
+					if isinstance(packet,BLEConnect):
 						self.device._setAddressMode(packet.initiatorType)
 						packet.packet /= HCI_Command_Hdr()/HCI_Cmd_LE_Create_Connection(
 											paddr=packet.dstAddr,
@@ -571,23 +571,23 @@ class BLEEmitter(wireless.Emitter):
 											#interval=packet.interval,
 											#min_interval=packet.interval,
 											#max_interval=packet.interval)
-					elif isinstance(packet,BLEConnectionCancel): # NOTE : was using isinstance
+					elif isinstance(packet,BLEConnectionCancel):
 						packet.packet /= HCI_Command_Hdr()/HCI_Cmd_LE_Create_Connection_Cancel()
 					else:
 						handle = (packet.connectionHandle if packet.connectionHandle != -1
 										else self.device.getCurrentHandle())
 
-						if isinstance(packet,BLEDisconnect): # NOTE : was using isinstance
+						if isinstance(packet,BLEDisconnect):
 							packet.packet /= HCI_Command_Hdr()/HCI_Cmd_Disconnect(handle=handle)
 
-						elif isinstance(packet,BLELongTermKeyRequest): # NOTE : was using isinstance
+						elif isinstance(packet,BLELongTermKeyRequest):
 							packet.packet /= HCI_Command_Hdr()/HCI_Cmd_LE_Start_Encryption_Request(
 											handle=handle,
 											rand=packet.rand,
 											ediv=packet.ediv,
 											ltk=packet.ltk)
 
-						elif isinstance(packet,BLELongTermKeyRequestReply): # NOTE : was using isinstance
+						elif isinstance(packet,BLELongTermKeyRequestReply):
 							packet.packet /= HCI_Command_Hdr()/(
 							HCI_Cmd_LE_Long_Term_Key_Request_Reply(handle=handle,ltk=packet.ltk)
 								if packet.positive
@@ -610,7 +610,7 @@ class BLEEmitter(wireless.Emitter):
 						if advType == "ADV_IND":
 							packet.packet /= BTLE_ADV_IND(AdvA = packet.addr, data=packet.data)
 						elif advType == "ADV_DIRECT_IND":
-							if isinstance(packet,BLEAdvDirectInd): # NOTE : was using isinstance
+							if isinstance(packet,BLEAdvDirectInd):
 								initA = packet.dstAddr
 							else:
 								initA = "00:00:00:00:00:00"
@@ -620,14 +620,14 @@ class BLEEmitter(wireless.Emitter):
 						elif advType == "ADV_SCAN_IND":
 							packet.packet /= BTLE_ADV_SCAN_IND()
 						elif advType == "SCAN_REQ":
-							if isinstance(packet,BLEAdvDirectInd): # NOTE : was using isinstance
+							if isinstance(packet,BLEAdvDirectInd):
 								scanA = packet.dstAddr
 							else:
 								scanA = "00:00:00:00:00:00"
 							packet.packet /= BTLE_SCAN_REQ(AdvA = packet.addr, ScanA = scanA)
 						elif advType == "SCAN_RSP":
 							packet.packet /= BTLE_SCAN_RSP(AdvA = packet.addr, data=packet.data)
-						elif advType == "CONNECT_REQ" or isinstance(packet,BLEConnectRequest): # NOTE : was using isinstance
+						elif advType == "CONNECT_REQ" or isinstance(packet,BLEConnectRequest):
 							packet.packet.TxAdd = 0x00 if packet.srcAddrType == "public" else 0x01
 							packet.packet.RxAdd = 0x00 if packet.dstAddrType == "public" else 0x01
 							packet.packet /= BTLE_CONNECT_REQ(
@@ -647,11 +647,11 @@ class BLEEmitter(wireless.Emitter):
 							packet.packet.access_addr = 0x8e89bed6
 					else:
 						packet.packet /= BTLE_DATA()
-						if isinstance(packet,BLEDisconnect): # NOTE : was using isinstance
+						if isinstance(packet,BLEDisconnect):
 							packet.packet /= BTLE_CTRL(opcode=0x02)
-						elif isinstance(packet,BLEEmptyPDU): # NOTE : was using isinstance
+						elif isinstance(packet,BLEEmptyPDU):
 							data.LLID = 1
-						elif isinstance(packet,BLEControlPDU): # NOTE : was using isinstance
+						elif isinstance(packet,BLEControlPDU):
 							optcode = 0
 							if packet.type == "LL_CONNECTION_UPDATE_REQ":
 								optcode = 0x00
@@ -713,20 +713,20 @@ class BLEEmitter(wireless.Emitter):
 
 
 					# Common upper layers
-					if isinstance(packet,BLEConnectionParameterUpdateRequest): # NOTE : was using isinstance
+					if isinstance(packet,BLEConnectionParameterUpdateRequest):
 						packet.packet /= L2CAP_Connection_Parameter_Update_Request(
 							max_interval=packet.maxInterval,
 							min_interval=packet.minInterval,
 							slave_latency=packet.slaveLatency,
 							timeout_mult=packet.timeoutMult)
 
-					elif isinstance(packet,BLEConnectionParameterUpdateResponse): # NOTE : was using isinstance
+					elif isinstance(packet,BLEConnectionParameterUpdateResponse):
 						packet.packet /= L2CAP_Connection_Parameter_Update_Response(move_result=packet.moveResult)
 
-					elif isinstance(packet,BLESecurityRequest): # NOTE : was using isinstance
+					elif isinstance(packet,BLESecurityRequest):
 						packet.packet /= SM_Security_Request(authentication=packet.authentication)
 
-					elif isinstance(packet,BLEPairingRequest): # NOTE : was using isinstance
+					elif isinstance(packet,BLEPairingRequest):
 						packet.packet /= SM_Pairing_Request(
 								iocap=packet.inputOutputCapability,
 								oob=1 if packet.outOfBand else 0,
@@ -738,7 +738,7 @@ class BLEEmitter(wireless.Emitter):
 						#packet.packet.show()
 
 
-					elif isinstance(packet,BLEPairingResponse): # NOTE : was using isinstance
+					elif isinstance(packet,BLEPairingResponse):
 						#packet.show()
 						packet.packet /= SM_Pairing_Response(
 								iocap=packet.inputOutputCapability,
@@ -750,31 +750,31 @@ class BLEEmitter(wireless.Emitter):
 						#print("Convert Pairing Response")
 						#packet.packet.show()
 
-					elif isinstance(packet,BLEPairingFailed): # NOTE : was using isinstance
+					elif isinstance(packet,BLEPairingFailed):
 						packet.packet /= SM_Failed(reason=packet.reason)
 
-					elif isinstance(packet,BLEPairingConfirm): # NOTE : was using isinstance
+					elif isinstance(packet,BLEPairingConfirm):
 						packet.packet /= SM_Confirm(confirm=packet.confirm)
 
 
-					elif isinstance(packet,BLEPairingRandom): # NOTE : was using isinstance
+					elif isinstance(packet,BLEPairingRandom):
 						packet.packet /= SM_Random(random=packet.random)
 
-					elif isinstance(packet,BLEEncryptionInformation): # NOTE : was using isinstance
+					elif isinstance(packet,BLEEncryptionInformation):
 						packet.packet /= SM_Encryption_Information(ltk=packet.ltk)
 
-					elif isinstance(packet,BLEMasterIdentification): # NOTE : was using isinstance
+					elif isinstance(packet,BLEMasterIdentification):
 						packet.packet /= SM_Master_Identification(ediv=packet.ediv, rand=packet.rand)
 
-					elif isinstance(packet,BLEIdentityInformation): # NOTE : was using isinstance
+					elif isinstance(packet,BLEIdentityInformation):
 						packet.packet /= SM_Identity_Information(irk=packet.irk)
 
-					elif isinstance(packet,BLEIdentityAddressInformation): # NOTE : was using isinstance
+					elif isinstance(packet,BLEIdentityAddressInformation):
 						packet.packet /= SM_Identity_Address_Information(
 											atype=0 if packet.type=="public" else 1,
 											address=packet.address
 												)
-					elif isinstance(packet,BLESigningInformation): # NOTE : was using isinstance
+					elif isinstance(packet,BLESigningInformation):
 						packet.packet /= SM_Signing_Information(csrk=packet.csrk)
 
 					elif isinstance(packet,BLEFindByTypeValueRequest):
@@ -786,63 +786,63 @@ class BLEEmitter(wireless.Emitter):
 					elif isinstance(packet,BLEFindByTypeValueResponse):
 						packet.packet /= ATT_Find_By_Type_Value_Response(handles=packet.handles)
 
-					elif isinstance(packet,BLEErrorResponse): # NOTE : was using isinstance
+					elif isinstance(packet,BLEErrorResponse):
 						packet.packet /= ATT_Error_Response(request=packet.request, handle=packet.handle,ecode=packet.ecode)
 
-					elif isinstance(packet,BLEExchangeMTURequest): # NOTE : was using isinstance
+					elif isinstance(packet,BLEExchangeMTURequest):
 						packet.packet /= ATT_Exchange_MTU_Request(mtu = packet.mtu)
 
-					elif isinstance(packet,BLEExchangeMTUResponse): # NOTE : was using isinstance
+					elif isinstance(packet,BLEExchangeMTUResponse):
 						packet.packet /= ATT_Exchange_MTU_Response(mtu = packet.mtu)
 
-					elif isinstance(packet,BLEReadByGroupTypeRequest): # NOTE : was using isinstance
+					elif isinstance(packet,BLEReadByGroupTypeRequest):
 						packet.packet /= ATT_Read_By_Group_Type_Request(
 								start=packet.startHandle,
 								end=packet.endHandle,
 								uuid=packet.uuid)
 
-					elif isinstance(packet,BLEReadByGroupTypeResponse): # NOTE : was using isinstance
+					elif isinstance(packet,BLEReadByGroupTypeResponse):
 						packet.packet /= ATT_Read_By_Group_Type_Response(data=packet.data,length=packet.length)
 
-					elif isinstance(packet,BLEReadByTypeRequest): # NOTE : was using isinstance
+					elif isinstance(packet,BLEReadByTypeRequest):
 						packet.packet /= ATT_Read_By_Type_Request(
 								start=packet.startHandle,
 								end=packet.endHandle,
 								uuid=packet.uuid)
 
-					elif isinstance(packet,BLEReadByTypeResponse): # NOTE : was using isinstance
+					elif isinstance(packet,BLEReadByTypeResponse):
 						packet.packet /= ATT_Read_By_Type_Response(packet.data)
 
-					elif isinstance(packet,BLEReadBlobRequest): # NOTE : was using isinstance
+					elif isinstance(packet,BLEReadBlobRequest):
 						packet.packet /= ATT_Read_Blob_Request(gatt_handle=packet.handle,offset=packet.offset)
-					elif isinstance(packet,BLEReadBlobResponse): # NOTE : was using isinstance
+					elif isinstance(packet,BLEReadBlobResponse):
 						packet.packet /= ATT_Read_Blob_Response(value=packet.value)
-					elif isinstance(packet,BLEHandleValueNotification): # NOTE : was using isinstance
+					elif isinstance(packet,BLEHandleValueNotification):
 						packet.packet /= ATT_Handle_Value_Notification(gatt_handle=packet.handle,value=packet.value)
-					elif isinstance(packet,BLEHandleValueIndication): # NOTE : was using isinstance
+					elif isinstance(packet,BLEHandleValueIndication):
 						packet.packet /= ATT_Handle_Value_Indication(gatt_handle=packet.handle,value=packet.value)
-					elif isinstance(packet,BLEHandleValueConfirmation): # NOTE : was using isinstance
+					elif isinstance(packet,BLEHandleValueConfirmation):
 						packet.packet /= ATT_Handle_Value_Confirmation()
 
-					elif isinstance(packet,BLEFindInformationRequest): # NOTE : was using isinstance
+					elif isinstance(packet,BLEFindInformationRequest):
 						packet.packet /= ATT_Find_Information_Request(start=packet.startHandle,end = packet.endHandle)
 
-					elif isinstance(packet,BLEFindInformationResponse): # NOTE : was using isinstance
+					elif isinstance(packet,BLEFindInformationResponse):
 						packet.packet /= ATT_Find_Information_Response(bytes([packet.format]) + packet.data)
 
-					elif isinstance(packet,BLEWriteRequest): # NOTE : was using isinstance
+					elif isinstance(packet,BLEWriteRequest):
 						packet.packet /= ATT_Write_Request(gatt_handle=packet.handle,data=packet.value)
 
-					elif isinstance(packet,BLEWriteCommand): # NOTE : was using isinstance
+					elif isinstance(packet,BLEWriteCommand):
 						packet.packet /= ATT_Write_Command(gatt_handle=packet.handle,data=packet.value)
 
-					elif isinstance(packet,BLEWriteResponse): # NOTE : was using isinstance
+					elif isinstance(packet,BLEWriteResponse):
 						packet.packet /= ATT_Write_Response()
 
-					elif isinstance(packet,BLEReadRequest): # NOTE : was using isinstance
+					elif isinstance(packet,BLEReadRequest):
 						packet.packet /= ATT_Read_Request(gatt_handle=packet.handle)
 
-					elif isinstance(packet,BLEReadResponse): # NOTE : was using isinstance
+					elif isinstance(packet,BLEReadResponse):
 						packet.packet /= ATT_Read_Response(value=packet.value)
 
 
